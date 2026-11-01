@@ -164,6 +164,22 @@ readable by everyone who can read the repository.
 | Secret Protection → Push protection | **On** |
 | Secret Protection → Validity checks | On |
 
+**Private repositories.** Private vulnerability reporting, CodeQL code scanning
+and Secret Protection (secret scanning, push protection, validity checks) are
+free only on public repositories; a private one needs a paid add-on, and the
+settings page then shows only *Dependency scanning* and *Dependabot*. Without
+them, keep secrets out of the repository by other means:
+
+- Real keys (AI provider, database, hosting) live only in `.env` (git-ignored)
+  locally and in the hosting platform's environment variables in production.
+  Never in a tracked file, a fixture, a test or a comment.
+- `.env.example` holds names and invented placeholder values only.
+- The `gitleaks` pre-commit hook scans the staged changes of every commit and
+  blocks it when it finds a key or token (`detect-private-key` covers private
+  keys). It runs on the developer's machine, so keep `pre-commit install` done.
+- If a secret is ever committed or pushed, revoke it at the provider first;
+  rewriting history does not make a leaked key safe.
+
 ## 5. Rulesets
 
 Settings → Rules → Rulesets → **New ruleset** → **Import a ruleset**, once per

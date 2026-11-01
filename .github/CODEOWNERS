@@ -2,19 +2,19 @@
 # Pair this with a branch ruleset that enables "Require review from Code Owners".
 # https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
-*               @alihaidar0
+*               @Aalihaidar
 
 # Infrastructure, CI/CD, and repo policy.
-/docker/        @alihaidar0
-/scripts/       @alihaidar0
-/.github/       @alihaidar0
-/docker-compose.yml @alihaidar0
-/.devcontainer/  @alihaidar0
-/.pre-commit-config.yaml @alihaidar0
-/README.md       @alihaidar0
+/docker/        @Aalihaidar
+/scripts/       @Aalihaidar
+/.github/       @Aalihaidar
+/docker-compose.yml @Aalihaidar
+/.devcontainer/  @Aalihaidar
+/.pre-commit-config.yaml @Aalihaidar
+/README.md       @Aalihaidar
 
 # The API contract. In a project, list BOTH the backend and the frontend owners
 # on these two lines (for example: /openapi/ @backend-owner @frontend-owner), so
 # a change to the contract is seen by whoever builds against it.
-/openapi/        @alihaidar0
-/.spectral.yaml  @alihaidar0
+/openapi/        @Aalihaidar
+/.spectral.yaml  @Aalihaidar
