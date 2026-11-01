@@ -7,6 +7,8 @@
 #   docker-compose  docker-compose.yml — postgres, redis, mailpit (tag + digest) AND
 #                   the dev image: once `bash scripts/pin-image.sh` pinned it to
 #                   python-X.Y.Z.R@sha256:…, new image builds arrive as PRs
+#   docker-compose  .github/api-tools/docker-compose.yml — oasdiff and Spectral
+#                   (own entry, so a failure there cannot block the dev stack)
 #   pre-commit      .pre-commit-config.yaml — hook revs
 #   uv              pyproject.toml + uv.lock — enabled by scripts/init-django.sh
 #                   (block at the end; commented here so the template itself,
@@ -63,12 +65,11 @@ updates:
     open-pull-requests-limit: 5
 
   # ── Dev services (postgres, redis, mailpit) ──────────────────────────
+  # The API-contract CI tools have their own entry below: one grouped pull request
+  # spanning both directories was rejected by GitHub ("invalid or unauthorized
+  # changes"), so each directory is updated on its own.
   - package-ecosystem: "docker-compose"
-    # "/" is the dev stack; the second directory holds the API-contract CI tools
-    # (oasdiff, Spectral) as pinned images.
-    directories:
-      - "/"
-      - "/.github/api-tools"
+    directory: "/"
     schedule: { interval: "weekly", day: "monday", time: "09:00", timezone: "UTC" }
     cooldown: { default-days: 7 }
     target-branch: "develop"
@@ -87,6 +88,24 @@ updates:
         patterns: ["*"]
         # The dev image always arrives as its own PR.
         exclude-patterns: ["alihaidar199527/django-devcontainer"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+
+  # ── API-contract CI tools (oasdiff, Spectral) ────────────────────────
+  # Pinned images in .github/api-tools/docker-compose.yml. Merge only stable
+  # oasdiff tags (it also publishes release candidates).
+  - package-ecosystem: "docker-compose"
+    directory: "/.github/api-tools"
+    schedule: { interval: "weekly", day: "monday", time: "09:00", timezone: "UTC" }
+    cooldown: { default-days: 7 }
+    target-branch: "develop"
+    assignees: ["Aalihaidar"]
+    commit-message: { prefix: "build", include: "scope" }
+    labels: ["dependencies", "docker"]
+    groups:
+      api-tools-minor-patch:
+        applies-to: version-updates
+        patterns: ["*"]
         update-types: ["minor", "patch"]
     open-pull-requests-limit: 5
 
