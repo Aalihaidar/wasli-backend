@@ -66,10 +66,12 @@ setting is listed in [`docs/github-setup.md`](../docs/github-setup.md).
 - **General:** default branch **`develop`**; *Allow merge commits* ✅ (squash
   and rebase ❌); *Automatically delete head branches* ✅. In the **template
   repository only**: *Template repository* ✅.
-- **Advanced Security:** private vulnerability reporting, dependency graph,
-  Dependabot alerts + security updates, CodeQL default setup, secret
-  protection + push protection — all ✅. Security updates open against
-  `develop`, the default branch, like the weekly version updates.
+- **Advanced Security:** dependency graph, Dependabot alerts, malware alerts and
+  (grouped) security updates ✅. Security updates open against `develop`, the
+  default branch, like the weekly version updates. A **private** repository does
+  not get private vulnerability reporting, CodeQL, secret scanning or push
+  protection without a paid add-on: the `gitleaks` pre-commit hook scans every
+  commit for secrets instead. On a public repository, enable all of them.
 - **Secrets and variables → Actions:** nothing is required. Optional: variable
   **`PUBLISH_IMAGE`** (`ghcr` or `dockerhub`; unset publishes nothing) and, for
   Docker Hub only, variable `DOCKERHUB_USERNAME` + secret `DOCKERHUB_TOKEN`; optional

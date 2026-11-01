@@ -131,3 +131,9 @@ $RECYCLE.BIN/
 
 # repomix output
 *-code.xml
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  LOCAL ASSISTANT FILES (never committed)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CLAUDE.md
+.claude/

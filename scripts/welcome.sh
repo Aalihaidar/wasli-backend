@@ -125,6 +125,6 @@ step "Committing from the host too, not just this container?" \
     "or a host commit stops with \"pre-commit not found\" (README → Git and SSH)."
 
 echo ""
-echo "  📖  https://github.com/alihaidar0/django-template#readme"
+echo "  📖  https://github.com/Aalihaidar/wasli-backend#readme"
 echo "$RULE"
 echo ""
