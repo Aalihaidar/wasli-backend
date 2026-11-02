@@ -9,7 +9,7 @@ The checklist of everything to do in this repository, from a fresh copy of the t
 - [x] Set the remote `origin` to the project repository
 - [x] Set the repository-local Git identity (`user.name`, `user.email`)
 - [x] Check in Actions that **Bootstrap main** and **Labels** ran green, and that the labels from `.github/labels.yml` exist
-- [ ] Keep local tooling files out of the repository (`.gitignore` entries merged into `develop`)
+- [x] Keep local tooling files out of the repository (`.gitignore` entries merged into `develop`)
 
 ## 2. Create the Django project
 
@@ -49,12 +49,12 @@ The checklist of everything to do in this repository, from a fresh copy of the t
 
 ## 5. First pull request
 
-- [ ] Create a topic branch (for example `chore/initial-setup`)
-- [ ] Commit the generated project with a Conventional Commit message
-- [ ] Push the branch and open a pull request into `develop`
-- [ ] **CI passed** is green (first time the required check exists)
-- [ ] Merge with **Create a merge commit**
-- [ ] Promote `develop` to `main` with a release pull request (source branch `develop`, merge commit)
+- [x] Create a topic branch (for example `chore/initial-setup`)
+- [x] Commit the generated project with a Conventional Commit message
+- [x] Push the branch and open a pull request into `develop`
+- [x] **CI passed** is green (first time the required check exists)
+- [x] Merge with **Create a merge commit**
+- [x] Promote `develop` to `main` with a release pull request (source branch `develop`, merge commit)
 
 ## 6. GitHub repository settings
 
@@ -62,9 +62,9 @@ The checklist of everything to do in this repository, from a fresh copy of the t
 - [x] Settings → Actions → General (allowed actions, pin to full commit SHA, workflow permissions)
 - [x] Settings → Advanced Security (dependency graph, Dependabot alerts and updates; the repository is private, so private vulnerability reporting, CodeQL and secret scanning are not offered)
 - [x] Add the `gitleaks` secret scanner to pre-commit (replaces GitHub secret scanning on a private repository)
-- [ ] Import the three rulesets (`protect-main`, `protect-develop`, `protect-tags`), only after **CI passed** has run once and `main` exists
+- [ ] Import the three rulesets (`protect-main`, `protect-develop`, `protect-tags`), only after **CI passed** has run once and `main` exists (not available while the repository is private on the free plan)
 - [x] Decide on image publishing: set `PUBLISH_IMAGE` (`ghcr` or `dockerhub`) or leave it unset
-- [ ] Verify the protection (direct pushes rejected, a topic branch cannot target `main`, only merge commits offered)
+- [ ] Verify the protection (direct pushes rejected, a topic branch cannot target `main`, only merge commits offered); blocked until the rulesets can be imported
 
 ## 7. Ready for the first endpoint
 
