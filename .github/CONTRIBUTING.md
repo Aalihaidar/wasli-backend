@@ -66,10 +66,12 @@ setting is listed in [`docs/github-setup.md`](../docs/github-setup.md).
 - **General:** default branch **`develop`**; *Allow merge commits* ✅ (squash
   and rebase ❌); *Automatically delete head branches* ✅. In the **template
   repository only**: *Template repository* ✅.
-- **Advanced Security:** private vulnerability reporting, dependency graph,
-  Dependabot alerts + security updates, CodeQL default setup, secret
-  protection + push protection — all ✅. Security updates open against
-  `develop`, the default branch, like the weekly version updates.
+- **Advanced Security:** dependency graph, Dependabot alerts, malware alerts and
+  (grouped) security updates ✅. Security updates open against `develop`, the
+  default branch, like the weekly version updates. A **private** repository does
+  not get private vulnerability reporting, CodeQL, secret scanning or push
+  protection without a paid add-on: the `gitleaks` pre-commit hook scans every
+  commit for secrets instead. On a public repository, enable all of them.
 - **Secrets and variables → Actions:** nothing is required. Optional: variable
   **`PUBLISH_IMAGE`** (`ghcr` or `dockerhub`; unset publishes nothing) and, for
   Docker Hub only, variable `DOCKERHUB_USERNAME` + secret `DOCKERHUB_TOKEN`; optional
@@ -104,7 +106,7 @@ jobs are simply not applicable at the current tier.
 
 **API contract jobs** (any tier, opt-in): when `openapi/schema.yaml` exists, `API schema is
 current`, `API style (Spectral)` and `API breaking changes (oasdiff)` also run. They use the
-pinned images in [`api-tools/docker-compose.yml`](api-tools/docker-compose.yml) and no GitHub
+pinned images in [`tools/api-tools/docker-compose.yml`](../tools/api-tools/docker-compose.yml) and no GitHub
 Action, so a missing allowed-actions entry can never fail the workflow. Details:
 [`docs/api-workflow.md`](../docs/api-workflow.md).
 
@@ -183,7 +185,7 @@ cooldown**:
 | --- | --- |
 | `github-actions` | workflow action SHAs (incl. the reusable builder) |
 | `docker` | `docker/Dockerfile.prod` — python base (patch updates only: a new minor is moved to with `scripts/set-python.sh`) + uv (tag + digest) |
-| `docker-compose` | `docker-compose.yml` — postgres, redis, mailpit **and the dev image**; `api-tools/docker-compose.yml` — oasdiff and Spectral (merge stable tags only) once `scripts/pin-image.sh` pinned it (tag + digest) |
+| `docker-compose` | `docker-compose.yml` — postgres, redis, mailpit **and the dev image**; `tools/api-tools/docker-compose.yml` — oasdiff and Spectral (merge stable tags only) once `scripts/pin-image.sh` pinned it (tag + digest) |
 | `pre-commit` | `.pre-commit-config.yaml` hook revs |
 | `uv` | `pyproject.toml` + `uv.lock` — enabled automatically by `scripts/init-django.sh` |
 

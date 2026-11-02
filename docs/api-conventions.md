@@ -66,3 +66,43 @@ converts to the user's time zone for display only. Dates without a time are `YYY
 - Use HTTP status codes for the outcome (`201` created, `204` no content, `400` invalid, `401`/`403`
   not authenticated/allowed, `404` not found, `409` conflict) and keep them in the schema.
 - An empty list is `200` with an empty `results`, never `404`.
+
+## Project rules
+
+Decisions specific to this project, on top of the defaults above.
+
+### Identifiers
+
+- Public ids are UUIDs. A restaurant also has a unique `slug`, used in URLs and QR codes (`/r/<slug>`).
+- Every message a client sends in a conversation carries a `client_message_id` (UUID). Retrying the same message reuses the id, and the server returns the earlier result instead of processing it twice.
+
+### Money
+
+- Amounts are integers in minor units (fils, 100 per AED) in fields named `*_minor`, with the currency alongside (`AED`). The API never carries formatted amounts or floats.
+- A client never sends a price. The server checks every item against the restaurant's menu and computes the totals.
+
+### Languages
+
+- Arabic (`ar`) and English (`en`) only. Text shown to customers comes as a pair of fields (`name_en`, `name_ar`, `description_en`, `description_ar`); the API returns both and the client picks one.
+- Chat messages are written by the server in the conversation's `locale`. A client renders them and never builds message text.
+
+### Authentication
+
+- Restaurant staff sign in with email and password (`POST /api/v1/auth/login`) and send `Authorization: Token <token>`. A demo login exists only while `DEMO_MODE` is on.
+- Customers start an anonymous session (`POST /api/v1/customers/session`) and send `Authorization: Customer <token>`. Phone verification is added later without changing the endpoints.
+- Every restaurant-owned resource is scoped to the caller's restaurant. Staff of one restaurant can never read or change another restaurant's data.
+
+### Errors
+
+- The error codes a client acts on are stable: `order_invalid_transition`, `item_unavailable`, `outside_parking_lot`, `invalid_location`, `ai_unavailable`, `transcription_failed`, `conversation_expired`, `invalid_action_for_state`, `audio_too_long`.
+- A missing or invalid answer inside the chat (for example a car colour) is not an HTTP error: the server asks the question again in the conversation.
+
+### Location
+
+- Latitude is within [-90, 90], longitude within [-180, 180] and the accuracy in metres is zero or more; anything else is `invalid_location`.
+- Location is personal data: it is exposed only to the staff of the restaurant that received the order and to the customer who placed it, and it is never written to logs.
+
+### Orders
+
+- Statuses: `placed`, `accepted`, `rejected`, `cancelled`, `ready`, `delivered`, `not_found`, `no_show`. Any other transition is `409` with `order_invalid_transition`.
+- Rejection reasons: `item_unavailable`, `too_busy`, `closing_soon`, `too_far`, `location_unclear`, `other`. A note is required for `other` and optional otherwise.

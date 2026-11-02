@@ -2,15 +2,14 @@
 
 ## Reporting a vulnerability
 
-Report security issues **privately** through GitHub's
-**Security → Advisories → Report a vulnerability** form on this repository.
+This repository is private. Report security issues **directly to the
+repository owner**, never in an issue or pull request, and never with the
+secret itself in the message. We aim to acknowledge a report within 3 business
+days and to agree a disclosure timeline with you.
 
-Please do **not** open a public issue or pull request for anything
-security-sensitive. We aim to acknowledge a report within 3 business days and
-to agree a disclosure timeline with you.
-
-The form is available when **Settings → Advanced Security → Private
-vulnerability reporting** is enabled.
+If the repository is ever made public, enable **Settings → Advanced Security →
+Private vulnerability reporting** and point this section at the
+**Security → Advisories → Report a vulnerability** form.
 
 ## Supported versions
 

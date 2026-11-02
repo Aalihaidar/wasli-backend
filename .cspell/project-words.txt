@@ -3,12 +3,14 @@
 # Add a word here only when it is a real name — fix actual typos instead.
 
 # People, accounts, projects
+Aalihaidar
 alihaidar
 axllent
 Haidar
 koalaman
 repomix
 rhysd
+wasli
 
 # VS Code marketplace publishers
 batisteo
@@ -29,6 +31,7 @@ chainctl
 chainguard
 errorlens
 ghaction
+gitleaks
 healthz
 Mailpit
 oasdiff
