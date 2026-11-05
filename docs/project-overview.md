@@ -82,7 +82,7 @@ flowchart LR
 ```
 
 - The two sites are separate Flutter apps in the sibling repository. They generate their API client from this repository's `openapi/schema.yaml`.
-- The demo runs on free plans: the API on Render, the database on Neon, the two sites on Cloudflare Pages. The product moves to paid always-on hosting without changing the data model or the API.
+- The demo runs on free plans: the API on Render, the database on Neon, the two sites on Cloudflare Pages. There are two environments: `develop` is staging (its own Render service and Neon project) and `main` is production (its own Render service and Neon project). Local development and tests also use the staging Neon project directly, with no local database. Everything in the demo stays on free plans. The product moves to paid always-on hosting without changing the data model or the API.
 - In the demo the sites poll every 3 seconds. The product replaces polling with a realtime stream and adds notifications, payments and phone verification.
 
 ## 4. How an order works
