@@ -79,7 +79,7 @@ The checklist of everything to do in this repository, from a fresh copy of the t
 
 ## 8. Later
 
-- [ ] Choose the hosting target and add a deployment workflow with its `staging` and `production` environments
+- [ ] After the demo, choose the hosting for the pilot (the owner decides whether it costs anything), keeping the split: `develop` is staging with its own database and service, `main` is production with its own
 - [ ] Review the Dependabot pull requests weekly and promote `develop` to `main`
 
 ## How the Wasli steps are organised
@@ -88,19 +88,23 @@ The sections below take the project from the finished scaffold to the complete d
 
 ## 9. D0: users, apps, settings and first deploy
 
-- [ ] Rebuild `users.User` with three sign-in identifiers, `username`, `email` and `phone` (international format), plus `phone_verified_at`, `email_verified_at` and `must_change_password`: each identifier unique and stored as NULL when empty, never as an empty string; at least one required; `username` is `USERNAME_FIELD`, starts with a letter and cannot contain `@`. Add an authentication backend that takes one value plus the password and finds the account by email, phone or username. Update the manager, admin and tests, delete `users/migrations/0001_initial.py`, regenerate it and reset the local database
+- [ ] **Needs the owner:** a Neon account and a Render account
+- [ ] Keep the demo on free plans: no payment method on Render, Neon, Cloudflare or Google AI Studio, and billing stays off on the Gemini project (check each provider's page: the free plans of Render and Neon stop or suspend at their limits instead of charging). A small paid upgrade is the owner's call, only if something hurts a meeting
+- [ ] Create two Neon projects in Frankfurt on the newest PostgreSQL, each with a fixed 0.25 CU compute and its direct connection string with `sslmode=require` (the host without `-pooler`): `wasli-staging` (for `develop`, and also for local development and tests) and `wasli-production` (for `main`). Separate projects keep each one's free compute hours apart, and the free plan allows several projects (check Neon's current limits). There is no local database: the dev container's `db` service stays unused
+- [ ] Copy `.env.example` to `.env`, set `DATABASE_URL` to the `wasli-staging` string and adjust the rest. Connection strings live only in `.env` (git-ignored) and in the Render environment variables, never in the repository
+- [ ] Check that `pytest` works against `wasli-staging` (it creates and drops its own `test_` database there) and that local work, tests and the staging service together stay inside that project's free compute hours
+- [ ] Rebuild `users.User` with three sign-in identifiers, `username`, `email` and `phone` (international format), plus `phone_verified_at`, `email_verified_at` and `must_change_password`: each identifier unique and stored as NULL when empty, never as an empty string; at least one required; `username` is `USERNAME_FIELD`, starts with a letter and cannot contain `@`. Add an authentication backend that takes one value plus the password and finds the account by email, phone or username. Update the manager, admin and tests, delete `users/migrations/0001_initial.py`, regenerate it and reset the `wasli-staging` database (never production)
 - [ ] Create the apps `core`, `restaurants`, `menu`, `customers`, `chat`, `orders` and `assistant`, and register them with `rest_framework.authtoken` in `INSTALLED_APPS`
-- [ ] Add the Wasli settings, read from the environment (demo mode, location check, screen-online requirement, assistant provider, Gemini key and model, assistant timeout and daily request limit, seed switch, platform admin credentials), with invented placeholders in `.env.example` and the same names in `docker-compose.yml`; the testing settings use the fake provider
+- [ ] Add the Wasli settings, read from the environment (demo mode, location check, screen-online requirement, assistant provider, Gemini key and model, assistant timeout and daily request limit, seed switch, platform admin credentials, and an `ENVIRONMENT` name, `staging` or `production`, that shows in the logs), with invented placeholders in `.env.example` and the same names in `docker-compose.yml`; the testing settings use the fake provider
 - [ ] Configure DRF: customer and staff authentication classes, `IsAuthenticated` by default with explicit public views, throttle classes and rates, the shared pagination class and page size, and `409` in the documented error codes with its enum override
-- [ ] Copy `.env.example` to `.env` and adjust it
-- [ ] Set `CORS_ALLOWED_ORIGINS` (local development now, the two site origins from the frontend team before the deploy)
 - [ ] Add `google-genai` (`uv add`)
 - [ ] Make `scripts/entrypoint.prod.sh` run `seed_demo` after the migrations when `RUN_SEED_DEMO=true`; the image smoke test leaves it unset
 - [ ] Update `docs/api-conventions.md`: the roles (platform team, restaurant `admin`, `cashier`, customer), restaurant accounts sign in with a username (the login accepts a username, an email or a phone number), and the three polling lists are the documented pagination exception
-- [ ] Create the Neon project (Frankfurt, newest PostgreSQL, fixed 0.25 CU, direct connection string with `sslmode=require`) and keep the string only in the Render environment
-- [ ] Create the Render web service (Docker, `docker/Dockerfile.prod`, Frankfurt, Free, health check `/healthz`, auto-deploy from `main`) and set its environment variables
-- [ ] Promote `develop` to `main` through a release pull request and confirm `GET /healthz` returns 200 on Render with the migrations in the log
-- [ ] **D0 done:** deployed on Render with Neon, `/healthz` green, **CI passed** green on `develop`
+- [ ] Set `CORS_ALLOWED_ORIGINS` per environment: local development now, then the staging and the production site origins from the frontend team (they need a staging and a production deploy of each of the two sites)
+- [ ] Create the Render web service `wasli-staging` (Docker, `docker/Dockerfile.prod`, Frankfurt, Free, health check `/healthz`, auto-deploy from `develop`) with the staging Neon string and its environment variables
+- [ ] Create the Render web service `wasli-production` (same settings, auto-deploy from `main`) with the production Neon string and its own environment variables. Both free services share the workspace's free instance hours and 5 GB of monthly traffic, and both sleep when idle
+- [ ] Merge the D0 pull request into `develop` and confirm `GET /healthz` returns 200 on staging with the migrations in the log; then promote `develop` to `main` through a release pull request and confirm the same on production
+- [ ] **D0 done:** staging (from `develop`) and production (from `main`) are deployed on Render with their own Neon projects, `/healthz` is green on both, **CI passed** is green on `develop`
 
 ## 10. D1: data model, read endpoints and the assistant spike
 
@@ -121,9 +125,9 @@ The sections below take the project from the finished scaffold to the complete d
 - [ ] **Needs the owner:** a Gemini key for a project made for the demo, and the WAV clips the frontend records in Chrome on Android and Safari on iPhone
 - [ ] Run the spike and report the model chosen, its free daily quota, the latency per call and which audio formats worked
 - [ ] Optional developer-only `draft_menu` command that turns menu photos into a draft for `seed/demo_data.json`
-- [ ] Set `RUN_SEED_DEMO=true` on Render and check that the deployed API loads the restaurant and its menu images
+- [ ] Set `RUN_SEED_DEMO=true` on both Render services and check that the deployed APIs load the restaurant and its menu images
 - [ ] Publish release `v0.1.0` (raise the version, release pull request, publish the draft) and tell the frontend team which release to pin
-- [ ] **D1 done:** the seed loads on Render, the four endpoints work there, `v0.1.0` is published and the spike is reported
+- [ ] **D1 done:** the seed loads on staging and production, the four endpoints work there, `v0.1.0` is published and the spike is reported
 
 ## 11. D2: the conversation engine
 
