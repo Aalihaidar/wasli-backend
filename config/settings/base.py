@@ -224,14 +224,39 @@ REST_FRAMEWORK: dict[str, object] = {
     "EXCEPTION_HANDLER": "drf_standardized_errors.handler.exception_handler",
     # Without this every operation would document a 404 for the ?format= query parameter.
     "URL_FORMAT_OVERRIDE": None,
+    # Staff send "Authorization: Token <token>". The customer scheme ("Authorization: Customer
+    # <token>", customers.auth) is added with the customers app, before it, in the same list.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    # Closed by default: a public view says so with an explicit AllowAny.
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    # Every list uses the same envelope (docs/api-conventions.md, Pagination).
+    "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardPagination",
+    "PAGE_SIZE": 20,
+    # Per client address when anonymous, per account otherwise. Counted in the process memory
+    # cache, so each Gunicorn worker keeps its own count. Stricter limits for one endpoint
+    # (messages, voice) are set on its view with ``throttle_scope``.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "240/min",
+    },
 }
 DRF_STANDARDIZED_ERRORS = {
     # Document only the errors a client acts on; a project that adds a code here also adds
     # its enum to ENUM_NAME_OVERRIDES below (ErrorCode<status>Enum, e.g. 500 → ServerErrorEnum).
-    "ALLOWED_ERROR_STATUS_CODES": ["400", "401", "403", "404", "429"],
+    "ALLOWED_ERROR_STATUS_CODES": ["400", "401", "403", "404", "409", "429"],
     # One shared 400 schema. The package's default documents every field's error codes per
     # operation, which makes generated clients grow by dozens of classes per endpoint.
-    "ERROR_SCHEMAS": {"400": "config.api_errors.Error400ResponseSerializer"},
+    "ERROR_SCHEMAS": {
+        "400": "config.api_errors.Error400ResponseSerializer",
+        # The package has no 409 schema of its own, so the project supplies it.
+        "409": "config.api_errors.Error409ResponseSerializer",
+    },
 }
 _ERROR_ENUMS = "drf_standardized_errors.openapi_serializers"
 SPECTACULAR_SETTINGS = {
@@ -250,6 +275,7 @@ SPECTACULAR_SETTINGS = {
         "ErrorCode401Enum": f"{_ERROR_ENUMS}.ErrorCode401Enum.choices",
         "ErrorCode403Enum": f"{_ERROR_ENUMS}.ErrorCode403Enum.choices",
         "ErrorCode404Enum": f"{_ERROR_ENUMS}.ErrorCode404Enum.choices",
+        "ErrorCode409Enum": "config.api_errors.ErrorCode409Enum.choices",
         "ErrorCode429Enum": f"{_ERROR_ENUMS}.ErrorCode429Enum.choices",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
