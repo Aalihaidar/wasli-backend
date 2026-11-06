@@ -88,7 +88,8 @@ Decisions specific to this project, on top of the defaults above.
 
 ### Authentication
 
-- Restaurant staff sign in with email and password (`POST /api/v1/auth/login`) and send `Authorization: Token <token>`. A demo login exists only while `DEMO_MODE` is on.
+- Everyone with an account (`users.User`) signs in with one identifier plus a password. The login field is named `username` and accepts a username, an email address or a phone number: a value with `@` is an email, a valid phone number (UAE numbers without a country code are accepted) is a phone, anything else is a username. Matching ignores case, spaces and phone formatting. A username has 3 to 30 characters (letters, digits, `.`, `_`, `-`), starts with a letter and has no `@`.
+- Restaurant staff (admin and cashier) always have a username and sign in with it (`POST /api/v1/auth/login`), then send `Authorization: Token <token>`. The platform team signs in to the Django admin with email. A demo login exists only while `DEMO_MODE` is on.
 - Customers start an anonymous session (`POST /api/v1/customers/session`) and send `Authorization: Customer <token>`. Phone verification is added later without changing the endpoints.
 - Every restaurant-owned resource is scoped to the caller's restaurant. Staff of one restaurant can never read or change another restaurant's data.
 

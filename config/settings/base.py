@@ -167,6 +167,9 @@ INSTALLED_APPS += [
 # task" — a from-scratch migration history plus a data migration for every
 # existing user — so this exists even though it changes nothing yet.
 AUTH_USER_MODEL = "users.User"
+# One value (email, phone or username) plus the password signs a user in, in the Django
+# admin and in the API login (users/backends.py).
+AUTHENTICATION_BACKENDS = ["users.backends.IdentifierBackend"]
 
 # ── API contract (drf-spectacular) ───────────────────────────────────────
 # openapi/schema.yaml is generated from the code (bash scripts/schema.sh generate)
