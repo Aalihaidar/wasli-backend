@@ -2,7 +2,7 @@
 
 A high-level picture of what Wasli is, who uses it, how an order travels through it and how this repository is organised. Read it first; the detailed rules are in [`api-conventions.md`](api-conventions.md) and in the generated `openapi/schema.yaml` (the final truth for endpoints, committed with the first endpoint). The checklist of work is [`steps.md`](steps.md).
 
-> **Status:** the repository holds the Django scaffold and the `users` app. Everything below that is not in `users` is the agreed design, built milestone by milestone (D0 to D4 for the demo, then the pilot).
+> **Status:** the repository holds the Django scaffold, the `users` app and the empty shells of the other apps (`core`, `restaurants`, `menu`, `customers`, `chat`, `orders`, `assistant`). Everything below that is not in `users` is the agreed design, built milestone by milestone (D0 to D4 for the demo, then the pilot).
 
 ## 1. What Wasli is
 

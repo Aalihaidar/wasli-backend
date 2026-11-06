@@ -156,10 +156,19 @@ DATABASES = {
 INSTALLED_APPS += [
     "corsheaders",
     "rest_framework",
+    "rest_framework.authtoken",  # staff API tokens (Authorization: Token <token>)
     "drf_spectacular",
     "drf_standardized_errors",
     "django_celery_beat",
     "users",
+    # Wasli apps (what each owns: docs/project-overview.md)
+    "core",
+    "restaurants",
+    "menu",
+    "customers",
+    "chat",
+    "orders",
+    "assistant",
 ]
 
 # A custom user model, in place from the first migration (users/models.py).
