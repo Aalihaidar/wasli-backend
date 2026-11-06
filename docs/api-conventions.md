@@ -55,6 +55,21 @@ Every list endpoint is paginated: the same class everywhere (`DEFAULT_PAGINATION
 `PAGE_SIZE` in `REST_FRAMEWORK`), the same response envelope, and a documented maximum page size.
 Prefer cursor pagination for large or fast-changing lists, page-number pagination for small, stable ones.
 
+The shared class is `core.pagination.StandardPagination`: page-number pagination (`?page=`, `?page_size=`)
+with a default page size of 20 and a maximum of 100, and the envelope `count`, `next`, `previous`, `results`.
+
+**Exception: the polling lists.** Three lists are read by the sites every few seconds and keep their own
+shapes instead of the envelope: `GET /restaurants/nearby`, `GET /conversations/{id}/messages?after_seq=`
+and `GET /staff/orders?since=`. They return everything newer than the cursor the client sends. Every other
+list is paginated.
+
+## Throttling
+
+Every view is throttled by default: 60 requests a minute per client address when anonymous and 240 a minute
+per account when signed in (`DEFAULT_THROTTLE_RATES`). A stricter limit for one endpoint (sending messages,
+voice) is set on its view. Counts live in each worker's memory, so the limits are approximate. A throttled
+request gets `429` with the code `throttled`.
+
 ## Timestamps
 
 UTC, ISO 8601, with an explicit offset: `2026-01-31T14:05:09Z`. Keep `USE_TZ = True`; a client
