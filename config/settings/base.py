@@ -15,6 +15,8 @@ from pathlib import Path
 
 import dj_database_url
 
+from config.env import env_bool, env_choice, env_int
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -142,6 +144,33 @@ CORS_ALLOWED_ORIGINS = [
     for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
     if o.strip()
 ]
+
+# ── Wasli settings ───────────────────────────────────────────────────────
+# Read from the environment (docker-compose.yml / .env locally, the Render service in
+# production); a bad value stops start-up (config/env.py). Demo-only behaviour sits behind
+# these switches, never behind separate code paths.
+# Which environment this is; shown in every log line.
+ENVIRONMENT = env_choice("ENVIRONMENT", "local", {"local", "staging", "production"})
+# Demo login, demo reset, and demo hints in /config. Off unless asked for.
+DEMO_MODE = env_bool("DEMO_MODE", default=False)
+# How an order's location is checked against the restaurant: "off", "warn" (record it,
+# never block) or "enforce" (refuse a clearly-outside order).
+LOCATION_CHECK = env_choice("LOCATION_CHECK", "warn", {"off", "warn", "enforce"})
+# True: list a restaurant only while its site polled in the last 60 seconds.
+REQUIRE_SCREEN_ONLINE = env_bool("REQUIRE_SCREEN_ONLINE", default=False)
+# The assistant layer only understands input (orders, car details, voice); it never writes
+# replies or prices. "fake" replays recorded outputs and is what the tests use.
+AI_PROVIDER = env_choice("AI_PROVIDER", "gemini", {"gemini", "fake"})
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")  # a secret: only in .env / Render
+# Never hard-coded: pick the audio-capable model in Google AI Studio and set it per environment.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
+AI_TIMEOUT_SECONDS = env_int("AI_TIMEOUT_SECONDS", 15, minimum=1)
+# Above this many assistant requests a day the bot switches to the no-assistant fallback.
+# A placeholder until the model and its free quota are chosen (about 80% of the quota).
+AI_DAILY_REQUEST_LIMIT = env_int("AI_DAILY_REQUEST_LIMIT", 100)
+# The platform-team superuser that ``seed_demo`` creates or updates (email sign-in).
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")  # a secret: only in .env / Render
 
 DATABASES = {
     "default": dict(
@@ -272,7 +301,10 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "plain": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"},
+        "plain": {
+            "format": f"{{asctime}} [{ENVIRONMENT}] {{levelname}} {{name}}: {{message}}",
+            "style": "{",
+        },
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "plain"},
