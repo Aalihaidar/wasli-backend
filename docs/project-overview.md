@@ -2,7 +2,7 @@
 
 A high-level picture of what Wasli is, who uses it, how an order travels through it and how this repository is organised. Read it first; the detailed rules are in [`api-conventions.md`](api-conventions.md) and in the generated `openapi/schema.yaml` (the final truth for endpoints, committed with the first endpoint). The checklist of work is [`steps.md`](steps.md).
 
-> **Status:** the repository holds the Django scaffold, the `users` app and the empty shells of the other apps (`core`, `restaurants`, `menu`, `customers`, `chat`, `orders`, `assistant`). Everything below that is not in `users` is the agreed design, built milestone by milestone (D0 to D4 for the demo, then the pilot).
+> **Status:** the repository holds the Django scaffold, the `users` app (sign-in with username, email or phone), the Wasli settings, the DRF defaults (token authentication, closed by default, shared pagination, throttling, the `409` error schema) and the empty shells of the other apps (`core`, `restaurants`, `menu`, `customers`, `chat`, `orders`, `assistant`). Everything else below is the agreed design, built milestone by milestone (D0 to D4 for the first version on staging, then the pilot). D0 is in progress: the settings cleanup, the Render services and the first deploy remain. Agreed on 2026-11-07 and built in D1: no demo mode (staging is shown to restaurant managers, production is the final product), data entered in the Django admin, images on Cloudflare R2, customer sign-up with verification codes and the `messaging` outbox.
 
 ## 1. What Wasli is
 
@@ -51,7 +51,7 @@ flowchart TB
 | Platform team | Superuser, signs in with email, uses Django admin | Everything: add, change or delete restaurants, menus, subscriptions, customers |
 | Restaurant admin | `User` + membership with role `admin`, signs in with a username | Everything inside their own restaurant: menu, prices, settings, reports, orders, and their cashiers and other staff (create, edit, deactivate, reactivate). Never another restaurant |
 | Cashier or other staff | `User` + membership with role `cashier`, signs in with a username | See orders, accept, reject, mark ready. Cannot change menu, prices, members or settings |
-| Customer | `User` + a `Customer` profile (anonymous in the demo), signs in with email, phone or username | Chat with a restaurant, place and follow their own orders |
+| Customer | `User` + a `Customer` profile, signs up with a name, an email or a phone number and a password, verifies it with a code, signs in with email, phone or username | Chat with a restaurant, place and follow their own orders |
 
 Every permission is a code checked on each request, never a role name: `orders.view`, `orders.decide`, `menu.edit`, `members.manage`, `restaurant.settings`, `reports.view`. An admin has all six, a cashier only the first two. A restaurant admin cannot grant more than their own role, and the last admin of a restaurant cannot be deactivated or demoted. Accounts are never deleted, because past orders point at the person who handled them: an admin deactivates a member (they can no longer sign in) and can reactivate them later.
 
@@ -82,8 +82,8 @@ flowchart LR
 ```
 
 - The two sites are separate Flutter apps in the sibling repository. They generate their API client from this repository's `openapi/schema.yaml`.
-- The demo runs on free plans: the API on Render, the database on Neon, the two sites on Cloudflare Pages. There are two environments: `develop` is staging (its own Render service and Neon project) and `main` is production (its own Render service and Neon project). Local development and tests also use the staging Neon project directly, with no local database. Both Neon projects, `wasli-staging` and `wasli-production`, are created, and the local `.env` points `DATABASE_URL` at `wasli-staging`. Neither Render service deploys on its own: after a group of pull requests is merged, the owner deploys by hand from the Render dashboard (staging from `develop`, production from `main`), so a merge never changes a running environment or its database by itself. Everything in the demo stays on free plans. The product moves to paid always-on hosting without changing the data model or the API.
-- In the demo the sites poll every 3 seconds. The product replaces polling with a realtime stream and adds notifications, payments and phone verification.
+- Staging runs on free plans: the API on Render, the database on Neon, the images on Cloudflare R2, the two sites on Cloudflare Pages. There are two environments: `develop` is staging (its own Render service and Neon project) and `main` is production (its own Render service and Neon project). Local development and tests also use the staging Neon project directly, with no local database. Both Neon projects, `wasli-staging` and `wasli-production`, are created, and the local `.env` points `DATABASE_URL` at `wasli-staging`. Neither Render service deploys on its own: after a group of pull requests is merged, the owner deploys by hand from the Render dashboard (staging from `develop`, production from `main`), so a merge never changes a running environment or its database by itself. Everything on staging stays on free plans. Production moves to paid always-on hosting without changing the data model or the API.
+- The sites poll every 3 seconds. Later versions replace polling with a realtime stream and add notifications and payments. Every outgoing email or SMS goes through the `messaging` app: on staging it is stored in an outbox shown in the Django admin (so the owner reads verification codes); in production it is sent by Resend (email) and an SMS provider.
 
 ## 4. How an order works
 
@@ -177,7 +177,7 @@ stateDiagram-v2
     no_show --> [*]
 ```
 
-The demo covers `placed`, `accepted` and `rejected` (`ready` is optional). The other statuses come with the pilot. Any other transition is refused with a `409` error.
+The first version covers `placed`, `accepted` and `rejected` (`ready` is optional). The other statuses come with the pilot. Any other transition is refused with a `409` error.
 
 ## 5. How the data fits together
 
@@ -185,7 +185,8 @@ The demo covers `placed`, `accepted` and `rejected` (`ready` is optional). The o
 erDiagram
     USER ||--o{ STAFF_MEMBERSHIP : "has (restaurant accounts)"
     RESTAURANT ||--o{ STAFF_MEMBERSHIP : employs
-    USER ||--o| CUSTOMER : "may have (registered customers)"
+    USER ||--o| CUSTOMER : "has (every customer signs up)"
+    USER ||--o{ VERIFICATION_CODE : "proves a contact with"
     CUSTOMER ||--o{ CUSTOMER_SESSION : "signs in with"
     CUSTOMER ||--o{ VEHICLE : owns
     PARKING_LOT ||--o{ RESTAURANT : hosts
@@ -219,9 +220,25 @@ erDiagram
         string role "admin or cashier"
         bool is_active
     }
+    VERIFICATION_CODE {
+        uuid id PK
+        uuid user_id FK
+        string purpose "sign-up, add contact or password reset"
+        string target "the email or phone the code was sent to"
+        string code_hash "never the plain code"
+        datetime expires_at
+        int attempts
+    }
+    OUTBOX_MESSAGE {
+        uuid id PK
+        string channel "email or sms"
+        string recipient
+        string purpose
+        string body "staging and local only"
+    }
     CUSTOMER {
         uuid id PK
-        uuid user_id FK "NULL for anonymous demo customers"
+        uuid user_id FK "the customer's account, required"
         string display_name
         bool is_blocked
     }
@@ -251,6 +268,7 @@ Rules that apply to every table:
 | `restaurants` | Parking lots, restaurants, menu images, staff memberships |
 | `menu` | Categories, items, option groups, options |
 | `customers` | Customer profiles, sessions and their authentication, vehicles, blocks |
+| `messaging` | The outbox (emails and SMS shown in the admin on staging), the delivery interface and its backends, verification codes |
 | `chat` | Conversations, messages, the conversation engine and every bot text in Arabic and English |
 | `orders` | Orders, order items, order events, pricing, order creation and status changes |
 | `assistant` | The adapter to the understanding provider (Gemini first, a fake one in tests), prompts, call log |
@@ -267,11 +285,11 @@ Working rules:
 | Step | What it delivers |
 | --- | --- |
 | D0 | Setup, apps, settings, first deploy |
-| D1 | Data model, restaurant and menu endpoints, seed with the first restaurant, the Gemini spike |
+| D1 | Data model, restaurant and menu endpoints, customer sign-up with verification codes and the admin outbox, images on R2, the first restaurant entered in the admin, the Gemini spike |
 | D2 | The conversation engine: welcome to a placed order, by text and by voice |
-| D3 | Restaurant side: staff login, orders list, accept and reject (**the demo is shown here**) |
+| D3 | Restaurant side: staff login, orders list, accept and reject (**shown to restaurant managers here**) |
 | D4 | Polish: second restaurant, logs, README |
-| Before the pilot | Restaurant-admin API (menu, prices, members), customer sign-up and sign-in, audit log, two-factor sign-in for the platform team |
-| Pilot and launch | Phone verification, more order statuses, payments choice, realtime, notifications, mobile apps |
+| Before the pilot | Restaurant-admin API (menu, prices, members), audit log, two-factor sign-in for the platform team, per-device staff tokens, a domain, the production email and SMS providers |
+| Pilot and launch | Production email and SMS, more order statuses, payments choice, realtime, notifications, mobile apps |
 
 The exact checklist, with every step, is in [`steps.md`](steps.md).
