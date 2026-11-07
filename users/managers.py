@@ -23,7 +23,7 @@ class UserManager(BaseUserManager["User"]):
     ) -> User:
         user = self.model(username=username, email=email, phone=phone, **extra_fields)
         user.normalize_identifiers()
-        # A password of None stores an unusable password (for example a seeded demo cashier).
+        # A password of None stores an unusable password (for example an account whose password is set later).
         user.set_password(password)
         # Rejects a bad identifier format, a duplicate, or a user without any identifier.
         user.full_clean(exclude=["password"])

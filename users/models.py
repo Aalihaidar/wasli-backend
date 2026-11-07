@@ -25,7 +25,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     A staff member's restaurant and role live in ``restaurants.StaffMembership``, not here,
     so one person can belong to several restaurants. Only the platform team gets
-    ``is_staff`` (access to the Django admin). Demo customers are anonymous and have no user.
+    ``is_staff`` (access to the Django admin). Customers have a user too: every customer signs up.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
