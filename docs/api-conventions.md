@@ -101,16 +101,28 @@ Decisions specific to this project, on top of the defaults above.
 - Arabic (`ar`) and English (`en`) only. Text shown to customers comes as a pair of fields (`name_en`, `name_ar`, `description_en`, `description_ar`); the API returns both and the client picks one.
 - Chat messages are written by the server in the conversation's `locale`. A client renders them and never builds message text.
 
+### Roles and permissions
+
+- Four kinds of people use the API or the admin. The **platform team** (the project owners) are superusers who manage everything in the Django admin. A **restaurant admin** (`StaffMembership.role = admin`) manages only their own restaurant: menu, prices, availability, members, settings, reports and orders. A **cashier** (`role = cashier`) sees orders and accepts, rejects or marks them ready, and cannot change the menu, prices, members or settings. A **customer** chats and orders from the car and sees only their own conversations and orders.
+- Access is decided by permission codes, never by role name: `orders.view`, `orders.decide`, `menu.edit`, `members.manage`, `restaurant.settings` and `reports.view`. An admin has all six, a cashier only `orders.view` and `orders.decide`.
+- A restaurant admin manages only their own restaurant's members and cannot grant more than their own role. The last admin of a restaurant cannot be deactivated or demoted. Only the platform team creates or deletes restaurants and creates a restaurant's first admin.
+- Accounts are deactivated, never deleted, because past orders point at the person who handled them. A restaurant admin can reactivate a deactivated member.
+- A request that is authenticated but not allowed gets `403` with `permission_denied`. Another restaurant's resource is a `404`, so a response never confirms that it exists.
+
 ### Authentication
 
 - Everyone with an account (`users.User`) signs in with one identifier plus a password. The login field is named `username` and accepts a username, an email address or a phone number: a value with `@` is an email, a valid phone number (UAE numbers without a country code are accepted) is a phone, anything else is a username. Matching ignores case, spaces and phone formatting. A username has 3 to 30 characters (letters, digits, `.`, `_`, `-`), starts with a letter and has no `@`.
-- Restaurant staff (admin and cashier) always have a username and sign in with it (`POST /api/v1/auth/login`), then send `Authorization: Token <token>`. The platform team signs in to the Django admin with email. A demo login exists only while `DEMO_MODE` is on.
-- Customers start an anonymous session (`POST /api/v1/customers/session`) and send `Authorization: Customer <token>`. Phone verification is added later without changing the endpoints.
+- Restaurant staff (admin and cashier) always have a username and sign in with it (`POST /api/v1/auth/login`), then send `Authorization: Token <token>`. The platform team signs in to the Django admin with email.
+- Customers sign up with a full name, an email address or a phone number, and a password. A six-digit code sent to that email or phone proves it; verifying it issues the customer token, sent as `Authorization: Customer <token>`. An unverified account cannot sign in or order. Codes expire after 10 minutes, allow five attempts and have a resend limit. From the account settings a customer can add the contact they did not give at sign-up (an email or a phone number); it is confirmed with a code sent to it and saved on the account only after that. Changing a contact that is already on the account is not offered. There is no anonymous customer session. The endpoint shapes are agreed in an API request before they are built.
 - Every restaurant-owned resource is scoped to the caller's restaurant. Staff of one restaurant can never read or change another restaurant's data.
+
+### Media
+
+- Images (logo, cover, menu images, item photos) are uploaded by the platform team in the admin and stored in object storage. The API returns absolute URLs, never storage paths.
 
 ### Errors
 
-- The error codes a client acts on are stable: `order_invalid_transition`, `item_unavailable`, `outside_parking_lot`, `invalid_location`, `ai_unavailable`, `transcription_failed`, `conversation_expired`, `invalid_action_for_state`, `audio_too_long`.
+- The error codes a client acts on are stable: `order_invalid_transition`, `item_unavailable`, `outside_parking_lot`, `invalid_location`, `ai_unavailable`, `transcription_failed`, `conversation_expired`, `invalid_action_for_state`, `audio_too_long`, and for customer accounts `account_exists`, `code_invalid`, `code_expired`, `too_many_attempts`, `account_not_verified`.
 - A missing or invalid answer inside the chat (for example a car colour) is not an HTTP error: the server asks the question again in the conversation.
 
 ### Location
