@@ -109,7 +109,8 @@ The sections below take the project from the finished scaffold to the complete f
 
 ## 10. D1: data model, read endpoints and the assistant spike
 
-- [ ] `core`: base model (UUID key, `created_at`, `updated_at`), money and haversine helpers, restaurant-scoped queryset, and the permission layer: permission codes (`orders.view`, `orders.decide`, `menu.edit`, `members.manage`, `restaurant.settings`, `reports.view`), the `admin` and `cashier` role map and a permission class that checks the caller's membership, never a role name
+- [x] `core`: the abstract base model (UUID key, `created_at`, `updated_at`), the money and haversine helpers (with location validation and the distance band), and the permission codes (`orders.view`, `orders.decide`, `menu.edit`, `members.manage`, `restaurant.settings`, `reports.view`) with the `admin` and `cashier` role map, all unit-tested
+- [ ] `core`: the restaurant-scoped queryset and the DRF permission class that checks the caller's membership for a permission code, never a role name (built with `StaffMembership` in the `restaurants` step)
 - [ ] `restaurants`: `ParkingLot`, `Restaurant` (with `is_demo`, an informational flag shown as an admin column and filter, no effect on behaviour), `RestaurantMenuImage` and `StaffMembership` (role `admin` or `cashier`; its user must have a username, so every restaurant account signs in with a username; the last admin of a restaurant cannot be deactivated or demoted), with their admin and tests
 - [ ] `menu`: `MenuCategory`, `MenuItem` (with aliases), `OptionGroup` and `Option`, with their admin and tests
 - [ ] `customers`: `Customer` (linked one-to-one to its `User`, required: every customer signs up), `CustomerSession` (only the token hash is stored), `Vehicle` and `CustomerBlock`, the `Authorization: Customer <token>` authentication class and its schema extension, with tests
