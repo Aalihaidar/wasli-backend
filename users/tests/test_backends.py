@@ -51,9 +51,9 @@ class TestIdentifierBackend:
         assert authenticate(username="sara.ahmed", password=PASSWORD) is None
 
     def test_account_without_a_usable_password_is_rejected(self) -> None:
-        User.objects.create_user("demo-cashier")
+        User.objects.create_user("cashier-one")
 
-        assert authenticate(username="demo-cashier", password="") is None
+        assert authenticate(username="cashier-one", password="") is None
 
     def test_a_phone_never_matches_a_username(self) -> None:
         # Usernames start with a letter, so the digits can only be read as a phone number.
