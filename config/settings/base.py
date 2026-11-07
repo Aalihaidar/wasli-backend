@@ -15,6 +15,8 @@ from pathlib import Path
 
 import dj_database_url
 
+from config.env import env_bool, env_choice, env_int
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -143,6 +145,33 @@ CORS_ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
+# ── Wasli settings ───────────────────────────────────────────────────────
+# Read from the environment (docker-compose.yml / .env locally, the Render service in
+# production); a bad value stops start-up (config/env.py). Demo-only behaviour sits behind
+# these switches, never behind separate code paths.
+# Which environment this is; shown in every log line.
+ENVIRONMENT = env_choice("ENVIRONMENT", "local", {"local", "staging", "production"})
+# Demo login, demo reset, and demo hints in /config. Off unless asked for.
+DEMO_MODE = env_bool("DEMO_MODE", default=False)
+# How an order's location is checked against the restaurant: "off", "warn" (record it,
+# never block) or "enforce" (refuse a clearly-outside order).
+LOCATION_CHECK = env_choice("LOCATION_CHECK", "warn", {"off", "warn", "enforce"})
+# True: list a restaurant only while its site polled in the last 60 seconds.
+REQUIRE_SCREEN_ONLINE = env_bool("REQUIRE_SCREEN_ONLINE", default=False)
+# The assistant layer only understands input (orders, car details, voice); it never writes
+# replies or prices. "fake" replays recorded outputs and is what the tests use.
+AI_PROVIDER = env_choice("AI_PROVIDER", "gemini", {"gemini", "fake"})
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")  # a secret: only in .env / Render
+# Never hard-coded: pick the audio-capable model in Google AI Studio and set it per environment.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
+AI_TIMEOUT_SECONDS = env_int("AI_TIMEOUT_SECONDS", 15, minimum=1)
+# Above this many assistant requests a day the bot switches to the no-assistant fallback.
+# A placeholder until the model and its free quota are chosen (about 80% of the quota).
+AI_DAILY_REQUEST_LIMIT = env_int("AI_DAILY_REQUEST_LIMIT", 100)
+# The platform-team superuser that ``seed_demo`` creates or updates (email sign-in).
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")  # a secret: only in .env / Render
+
 DATABASES = {
     "default": dict(
         dj_database_url.config(
@@ -156,10 +185,19 @@ DATABASES = {
 INSTALLED_APPS += [
     "corsheaders",
     "rest_framework",
+    "rest_framework.authtoken",  # staff API tokens (Authorization: Token <token>)
     "drf_spectacular",
     "drf_standardized_errors",
     "django_celery_beat",
     "users",
+    # Wasli apps (what each owns: docs/project-overview.md)
+    "core",
+    "restaurants",
+    "menu",
+    "customers",
+    "chat",
+    "orders",
+    "assistant",
 ]
 
 # A custom user model, in place from the first migration (users/models.py).
@@ -167,6 +205,9 @@ INSTALLED_APPS += [
 # task" — a from-scratch migration history plus a data migration for every
 # existing user — so this exists even though it changes nothing yet.
 AUTH_USER_MODEL = "users.User"
+# One value (email, phone or username) plus the password signs a user in, in the Django
+# admin and in the API login (users/backends.py).
+AUTHENTICATION_BACKENDS = ["users.backends.IdentifierBackend"]
 
 # ── API contract (drf-spectacular) ───────────────────────────────────────
 # openapi/schema.yaml is generated from the code (bash scripts/schema.sh generate)
@@ -183,14 +224,39 @@ REST_FRAMEWORK: dict[str, object] = {
     "EXCEPTION_HANDLER": "drf_standardized_errors.handler.exception_handler",
     # Without this every operation would document a 404 for the ?format= query parameter.
     "URL_FORMAT_OVERRIDE": None,
+    # Staff send "Authorization: Token <token>". The customer scheme ("Authorization: Customer
+    # <token>", customers.auth) is added with the customers app, before it, in the same list.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    # Closed by default: a public view says so with an explicit AllowAny.
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    # Every list uses the same envelope (docs/api-conventions.md, Pagination).
+    "DEFAULT_PAGINATION_CLASS": "core.pagination.StandardPagination",
+    "PAGE_SIZE": 20,
+    # Per client address when anonymous, per account otherwise. Counted in the process memory
+    # cache, so each Gunicorn worker keeps its own count. Stricter limits for one endpoint
+    # (messages, voice) are set on its view with ``throttle_scope``.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "240/min",
+    },
 }
 DRF_STANDARDIZED_ERRORS = {
     # Document only the errors a client acts on; a project that adds a code here also adds
     # its enum to ENUM_NAME_OVERRIDES below (ErrorCode<status>Enum, e.g. 500 → ServerErrorEnum).
-    "ALLOWED_ERROR_STATUS_CODES": ["400", "401", "403", "404", "429"],
+    "ALLOWED_ERROR_STATUS_CODES": ["400", "401", "403", "404", "409", "429"],
     # One shared 400 schema. The package's default documents every field's error codes per
     # operation, which makes generated clients grow by dozens of classes per endpoint.
-    "ERROR_SCHEMAS": {"400": "config.api_errors.Error400ResponseSerializer"},
+    "ERROR_SCHEMAS": {
+        "400": "config.api_errors.Error400ResponseSerializer",
+        # The package has no 409 schema of its own, so the project supplies it.
+        "409": "config.api_errors.Error409ResponseSerializer",
+    },
 }
 _ERROR_ENUMS = "drf_standardized_errors.openapi_serializers"
 SPECTACULAR_SETTINGS = {
@@ -209,6 +275,7 @@ SPECTACULAR_SETTINGS = {
         "ErrorCode401Enum": f"{_ERROR_ENUMS}.ErrorCode401Enum.choices",
         "ErrorCode403Enum": f"{_ERROR_ENUMS}.ErrorCode403Enum.choices",
         "ErrorCode404Enum": f"{_ERROR_ENUMS}.ErrorCode404Enum.choices",
+        "ErrorCode409Enum": "config.api_errors.ErrorCode409Enum.choices",
         "ErrorCode429Enum": f"{_ERROR_ENUMS}.ErrorCode429Enum.choices",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
@@ -260,7 +327,10 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "plain": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"},
+        "plain": {
+            "format": f"{{asctime}} [{ENVIRONMENT}] {{levelname}} {{name}}: {{message}}",
+            "style": "{",
+        },
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "plain"},

@@ -51,10 +51,12 @@ zizmor
 zizmorcore
 
 # Packages, system, file patterns
+authtoken
 corsheaders
 dmypy
 ehthumbs
 encryptable
+genai
 hardlink
 htmlcov
 libpq
@@ -88,3 +90,5 @@ USERPROFILE
 pmcs
 pmmk
 pmsu
+neondb
+onrender
