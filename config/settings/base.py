@@ -147,12 +147,10 @@ CORS_ALLOWED_ORIGINS = [
 
 # ── Wasli settings ───────────────────────────────────────────────────────
 # Read from the environment (docker-compose.yml / .env locally, the Render service in
-# production); a bad value stops start-up (config/env.py). Demo-only behaviour sits behind
-# these switches, never behind separate code paths.
+# production); a bad value stops start-up (config/env.py). Differences between environments
+# sit behind these switches, never behind separate code paths.
 # Which environment this is; shown in every log line.
 ENVIRONMENT = env_choice("ENVIRONMENT", "local", {"local", "staging", "production"})
-# Demo login, demo reset, and demo hints in /config. Off unless asked for.
-DEMO_MODE = env_bool("DEMO_MODE", default=False)
 # How an order's location is checked against the restaurant: "off", "warn" (record it,
 # never block) or "enforce" (refuse a clearly-outside order).
 LOCATION_CHECK = env_choice("LOCATION_CHECK", "warn", {"off", "warn", "enforce"})
@@ -168,9 +166,6 @@ AI_TIMEOUT_SECONDS = env_int("AI_TIMEOUT_SECONDS", 15, minimum=1)
 # Above this many assistant requests a day the bot switches to the no-assistant fallback.
 # A placeholder until the model and its free quota are chosen (about 80% of the quota).
 AI_DAILY_REQUEST_LIMIT = env_int("AI_DAILY_REQUEST_LIMIT", 100)
-# The platform-team superuser that ``seed_demo`` creates or updates (email sign-in).
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")  # a secret: only in .env / Render
 
 DATABASES = {
     "default": dict(

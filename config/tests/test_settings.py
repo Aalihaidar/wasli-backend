@@ -10,7 +10,6 @@ def test_tests_never_use_a_real_assistant_provider() -> None:
 def test_wasli_settings_have_valid_values() -> None:
     assert settings.ENVIRONMENT in {"local", "staging", "production"}
     assert settings.LOCATION_CHECK in {"off", "warn", "enforce"}
-    assert isinstance(settings.DEMO_MODE, bool)
     assert isinstance(settings.REQUIRE_SCREEN_ONLINE, bool)
     assert settings.AI_TIMEOUT_SECONDS >= 1
     assert settings.AI_DAILY_REQUEST_LIMIT >= 0

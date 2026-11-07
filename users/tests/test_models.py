@@ -26,7 +26,7 @@ class TestUserManager:
         assert user.pk.version == 4
 
     def test_create_user_without_password_is_unusable(self) -> None:
-        user = User.objects.create_user("demo-cashier")
+        user = User.objects.create_user("cashier-one")
 
         assert not user.has_usable_password()
 
