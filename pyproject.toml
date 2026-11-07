@@ -69,7 +69,7 @@ django_settings_module = "config.settings.development"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.testing"
-addopts = "--strict-markers"
+addopts = "--strict-markers --ds=config.settings.testing"
 
 [tool.coverage.run]
 branch = true
