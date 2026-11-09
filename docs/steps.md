@@ -1,6 +1,6 @@
 # Project steps
 
-The checklist of everything to do in this repository, from a fresh copy of the template to a project that is ready for its first endpoint. Tick a step (`- [x]`) as soon as it is done, in the same pull request that completes it. The detailed instructions behind each step are in the [README](../README.md) and in [`github-setup.md`](github-setup.md).
+The checklist of everything to do in this repository, from a fresh copy of the template to a project that is ready for its first endpoint (sections 1 to 8), then the Wasli milestones D0 to D4 and what comes after (sections 9 to 15). Tick a step (`- [x]`) as soon as it is done, in the same pull request that completes it. The detailed instructions behind each step are in the [README](../README.md) and in [`github-setup.md`](github-setup.md).
 
 ## 1. Repository and local environment
 
@@ -80,7 +80,7 @@ The checklist of everything to do in this repository, from a fresh copy of the t
 ## 8. Later
 
 - [ ] After the first presentation to restaurant managers, choose the hosting for the pilot (the owner decides whether it costs anything), keeping the split: `develop` is staging with its own database and service, `main` is production with its own
-- [ ] Review the Dependabot pull requests weekly and promote `develop` to `main`
+- [ ] Review the Dependabot pull requests weekly; promote `develop` to `main` only when needed (a release or milestone is ready, or production needs the new code), not after every merge
 
 ## How the Wasli steps are organised
 
@@ -95,7 +95,7 @@ The sections below take the project from the finished scaffold to the complete f
 - [x] Check that `pytest` works against `wasli-staging` (it creates and drops its own `test_` database there) and that local work, tests and the staging service together stay inside that project's free compute hours (`pytest` runs against `wasli-staging` and passes; checked in the Neon dashboard on 2026-11-07: 0.21 compute CU-hours and 32.75 MB used since the project was created, the compute sleeps when idle; the autoscaling range stays at the free plan's 0.25 to 2 CU for now (owner's choice): if the free hours run low, lower the maximum to 0.25 CU. `/healthz` does not query the database, so Render's health checks do not wake Neon; recheck the usage graph after the first staging deploy)
 - [x] Rebuild `users.User` with three sign-in identifiers, `username`, `email` and `phone` (international format), plus `phone_verified_at`, `email_verified_at` and `must_change_password`: each identifier unique and stored as NULL when empty, never as an empty string; at least one required; `username` is `USERNAME_FIELD`, starts with a letter and cannot contain `@`. Add an authentication backend that takes one value plus the password and finds the account by email, phone or username. Update the manager, admin and tests, delete `users/migrations/0001_initial.py`, regenerate it and reset the `wasli-staging` database (never production)
 - [x] Create the apps `core`, `restaurants`, `menu`, `customers`, `chat`, `orders` and `assistant`, and register them with `rest_framework.authtoken` in `INSTALLED_APPS`
-- [x] Add the Wasli settings, read from the environment (demo mode, location check, screen-online requirement, assistant provider, Gemini key and model, assistant timeout and daily request limit, seed switch, platform admin credentials, and an `ENVIRONMENT` name, `staging` or `production`, that shows in the logs), with invented placeholders in `.env.example` and the same names in `docker-compose.yml`; the testing settings use the fake provider
+- [x] Add the Wasli settings, read from the environment (location check, screen-online requirement, assistant provider, Gemini key and model, assistant timeout and daily request limit, and an `ENVIRONMENT` name, `local`, `staging` or `production`, that shows in the logs), with invented placeholders in `.env.example` and the same names in `docker-compose.yml`; the testing settings use the fake provider (the demo and seed settings of the first draft were removed by the settings cleanup below)
 - [x] Configure DRF: customer and staff authentication classes, `IsAuthenticated` by default with explicit public views, throttle classes and rates, the shared pagination class and page size, and `409` in the documented error codes with its enum override (the staff token class, defaults, throttling, pagination and `409` are done; the customer authentication class came with the `customers` step in section 10)
 - [x] Add `google-genai` (`uv add`)
 - [x] **Needs the owner:** update the Notion pages (Conclusion, Plan & Strategy, Backend, Demo, API contract, Backend build guide, Frontend pages) with the decisions of 2026-11-07, replacing the old text, from the owner's own account (done on 2026-11-09; the Demo page is now titled "Staging (first version)")
