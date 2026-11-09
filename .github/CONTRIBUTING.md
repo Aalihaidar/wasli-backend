@@ -42,6 +42,9 @@ develop  ───────────────────────�
   breaking change is `type!:` with a `BREAKING CHANGE:` footer.
 - Local safety nets (the rulesets are the real gate): `no-commit-to-branch`
   stops a commit on `develop`/`main`, `block-protected-push` stops a push.
+- Before a push, a `mypy (clean run, as CI does)` hook type-checks from scratch (about 15 seconds).
+  mypy's incremental cache can hide an error that CI reports, so run `mypy --no-incremental .`
+  by hand when you want the same answer as CI.
 
 ---
 

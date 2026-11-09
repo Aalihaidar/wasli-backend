@@ -37,7 +37,7 @@ class TestCustomer:
     def test_the_profile_is_reachable_from_the_user(self) -> None:
         customer = make_customer()
 
-        assert customer.user.customer == customer  # type: ignore[attr-defined]
+        assert customer.user.customer == customer
 
     def test_the_locale_is_one_of_the_two_languages(self) -> None:
         customer = make_customer()
