@@ -18,6 +18,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+from .api_docs import docs_urlpatterns
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Swagger UI and the live schema: staff only, local and staging only (config/api_docs.py).
+    *docs_urlpatterns(),
 ]
