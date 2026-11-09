@@ -8,6 +8,7 @@ so one restaurant can never read or change another's data. Each endpoint also ge
 import uuid
 from typing import Self, TypeVar
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from core.models import BaseModel
@@ -51,3 +52,20 @@ class RestaurantOwnedModel(BaseModel):
 
     class Meta:
         abstract = True
+
+
+def align_with_parent(
+    obj: RestaurantOwnedModel, parent: RestaurantOwnedModel | None, field: str
+) -> None:
+    """Make a child row belong to its parent's restaurant.
+
+    A child (a menu item under a category, an option under a group) takes the restaurant of
+    its parent when none is set, and is refused when it names a different one, so a row
+    can never point at another restaurant's parent.
+    """
+    if parent is None:
+        return
+    if obj.restaurant_id is None:
+        obj.restaurant_id = parent.restaurant_id
+    elif obj.restaurant_id != parent.restaurant_id:
+        raise ValidationError({field: "This belongs to a different restaurant."})
