@@ -15,6 +15,22 @@ class DistanceBand(StrEnum):
     UNKNOWN = "unknown"
 
 
+class LocationSource(StrEnum):
+    """Where a customer's position came from: the phone's GPS, a position the app made up
+    for testing on staging, or none because the customer did not share it."""
+
+    GPS = "gps"
+    SIMULATED = "simulated"
+    NONE = "none"
+
+
+LOCATION_SOURCE_CHOICES = [
+    (LocationSource.GPS.value, "GPS"),
+    (LocationSource.SIMULATED.value, "Simulated"),
+    (LocationSource.NONE.value, "Not shared"),
+]
+
+
 def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Great-circle distance in metres between two points given in degrees."""
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
