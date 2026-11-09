@@ -195,7 +195,7 @@ jobs:
     name: pre-commit
     needs: detect
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -218,12 +218,33 @@ jobs:
 
       # Same hooks as the local git hooks: ruff (lint + format), django-upgrade,
       # file hygiene. One source of truth for code style.
-      # no-commit-to-branch and the pre-push guard are local safety nets (CI
-      # runs on develop/main refs on dispatch), so they are skipped here.
+      #
+      # Skipped here:
+      #  - no-commit-to-branch and the pre-push guard are local safety nets (CI runs on
+      #    develop/main refs on dispatch);
+      #  - shellcheck, actionlint and hadolint: building them downloads a binary from
+      #    GitHub releases, which can answer HTTP 5xx for minutes. The Lint job runs the
+      #    same three tools on the same files by other means (the runner's ShellCheck, the
+      #    actionlint action, the hadolint action), and they still run in the local hooks.
+      #
+      # Exit code 1 means a hook failed or changed a file: it is reported at once. Exit
+      # code 3 means pre-commit itself failed (for example a hook environment could not be
+      # built from a registry): only that case is retried, up to three times.
       - name: Run all hooks
         env:
-          SKIP: no-commit-to-branch,block-protected-push
-        run: uvx pre-commit run --all-files --show-diff-on-failure --color=always
+          SKIP: no-commit-to-branch,block-protected-push,shellcheck,actionlint,hadolint
+        run: |
+          for attempt in 1 2 3; do
+            status=0
+            uvx pre-commit run --all-files --show-diff-on-failure --color=always || status=$?
+            if [ "$status" -ne 3 ]; then
+              exit "$status"
+            fi
+            echo "::warning title=pre-commit failed to run::Attempt ${attempt} of 3 ended with an internal error (usually a network error while building a hook); retrying."
+            sleep $((attempt * 30))
+          done
+          echo "::error title=pre-commit failed to run::All 3 attempts ended with an internal error."
+          exit 1
 
   typecheck:
     name: mypy
