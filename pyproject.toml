@@ -10,6 +10,7 @@ dependencies = [
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.18.3",
     "drf-spectacular>=0.30.0",
+    "drf-spectacular-sidecar>=2026.10.1",
     "drf-standardized-errors[openapi]>=0.16.0",
     "google-genai>=3.0.0",
     "gunicorn>=26.2.0",

@@ -182,6 +182,7 @@ INSTALLED_APPS += [
     "rest_framework",
     "rest_framework.authtoken",  # staff API tokens (Authorization: Token <token>)
     "drf_spectacular",
+    "drf_spectacular_sidecar",  # Swagger UI files served from the app, no CDN
     "drf_standardized_errors",
     "django_celery_beat",
     "users",
@@ -259,6 +260,16 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "The HTTP API of Wasli: order from the car through a chat with the restaurant.",
     "VERSION": "0.1.0",  # the API contract version, not the app's release
     "SERVE_INCLUDE_SCHEMA": False,
+    # Swagger UI ships inside the image (drf-spectacular-sidecar): no CDN, so the page also
+    # works under a strict CSP. The routes are in config/api_docs.py (staff only, local and
+    # staging only).
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "displayRequestDuration": True,
+        "persistAuthorization": True,
+    },
     # Separate request and response components: what client generators expect.
     "COMPONENT_SPLIT_REQUEST": True,
     # Keep /api/v1/ out of operation ids and tags (path versioning).
