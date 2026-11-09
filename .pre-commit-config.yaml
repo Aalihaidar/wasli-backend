@@ -68,7 +68,7 @@ repos:
       - id: gitleaks
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.2
+    rev: v0.17.3
     hooks:
       - id: ruff-check
         args: [--fix, --output-format=full]
@@ -84,13 +84,13 @@ repos:
 
   # Keeps uv.lock in sync whenever pyproject.toml changes.
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.13.5
+    rev: 0.13.6
     hooks:
       - id: uv-lock
 
   # Schema-validates the workflow and Dependabot files before they reach CI.
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.38.2
+    rev: 0.39.0
     hooks:
       - id: check-github-workflows
       - id: check-dependabot
@@ -132,7 +132,7 @@ repos:
       - id: hadolint
 
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
@@ -145,6 +145,19 @@ repos:
         name: block direct pushes to main and develop
         entry: bash scripts/block-protected-push.sh
         language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
+
+      # CI type-checks from scratch. mypy's incremental cache can hide an error (or an
+      # unused `type: ignore`) that only a clean run reports, for example a reverse relation
+      # that appears once another app is loaded. This hook runs the same clean check before
+      # a push, so that failure is found here and not in the pull request.
+      - id: mypy
+        name: mypy (clean run, as CI does)
+        entry: uv run --frozen mypy --no-incremental .
+        language: system
+        types: [python]
         stages: [pre-push]
         always_run: true
         pass_filenames: false
