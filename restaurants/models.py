@@ -121,6 +121,7 @@ class StaffMembership(RestaurantOwnedModel):
     The role is mapped to permission codes in ``core.permissions``. Rules kept here:
 
     * every restaurant account signs in with a username, so the user must have one;
+    * the user is not a customer: an account is staff or a customer, never both;
     * the last active admin of a restaurant cannot be demoted, deactivated or removed;
     * a member is deactivated, never deleted, so their history stays attached.
     """
@@ -164,6 +165,17 @@ class StaffMembership(RestaurantOwnedModel):
         if not removing and self.user_id is not None and not self.user.username:
             raise ValidationError(
                 {"user": "A restaurant account must have a username to sign in with."}
+            )
+        # A person is a customer or restaurant staff, never both (customers.Customer).
+        if (
+            not removing
+            and self.user_id is not None
+            and getattr(self.user, "customer", None) is not None
+        ):
+            raise ValidationError(
+                {
+                    "user": "A customer account cannot also be a restaurant staff account."
+                }
             )
         self._check_last_admin(removing=removing)
 
