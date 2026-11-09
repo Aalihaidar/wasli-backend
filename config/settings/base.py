@@ -154,6 +154,9 @@ ENVIRONMENT = env_choice("ENVIRONMENT", "local", {"local", "staging", "productio
 # How an order's location is checked against the restaurant: "off", "warn" (record it,
 # never block) or "enforce" (refuse a clearly-outside order).
 LOCATION_CHECK = env_choice("LOCATION_CHECK", "warn", {"off", "warn", "enforce"})
+# How outgoing email and SMS leave the system (messaging/backends.py). "outbox" stores them
+# in the database for the owner to read in the admin; it refuses to run in production.
+MESSAGING_BACKEND = env_choice("MESSAGING_BACKEND", "outbox", {"outbox"})
 # True: list a restaurant only while its site polled in the last 60 seconds.
 REQUIRE_SCREEN_ONLINE = env_bool("REQUIRE_SCREEN_ONLINE", default=False)
 # The assistant layer only understands input (orders, car details, voice); it never writes
@@ -194,6 +197,7 @@ INSTALLED_APPS += [
     "chat",
     "orders",
     "assistant",
+    "messaging",
 ]
 
 # A custom user model, in place from the first migration (users/models.py).
