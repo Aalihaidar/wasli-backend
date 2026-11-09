@@ -104,6 +104,12 @@ setting is listed in [`docs/github-setup.md`](../docs/github-setup.md).
 The `CI passed` gate job passes when every applicable job passed — skipped
 jobs are simply not applicable at the current tier.
 
+**A job that fails while downloading a tool** (HTTP 502, 503 or 504 from GitHub, for example while a
+hook such as ShellCheck or actionlint is built) is a network error, not a problem in your change.
+The `pre-commit` job retries the hook installation up to three times and the `Lint` job retries
+actionlint once. If a job still fails with a download error, open the run and choose
+**Re-run failed jobs**; do not change code to "fix" it.
+
 **API contract jobs** (any tier, opt-in): when `openapi/schema.yaml` exists, `API schema is
 current`, `API style (Spectral)` and `API breaking changes (oasdiff)` also run. They use the
 pinned images in [`tools/api-tools/docker-compose.yml`](../tools/api-tools/docker-compose.yml) and no GitHub
