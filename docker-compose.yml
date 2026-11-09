@@ -57,6 +57,7 @@ x-dev-image: &dev-image
     # no key is needed; set AI_PROVIDER=gemini plus the key and model in .env to use the real one.
     ENVIRONMENT: ${ENVIRONMENT:-local}
     LOCATION_CHECK: ${LOCATION_CHECK:-warn}
+    MESSAGING_BACKEND: ${MESSAGING_BACKEND:-outbox}
     REQUIRE_SCREEN_ONLINE: ${REQUIRE_SCREEN_ONLINE:-false}
     AI_PROVIDER: ${AI_PROVIDER:-fake}
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
