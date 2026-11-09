@@ -7,7 +7,7 @@
 #  Run it by hand from the Actions tab if you want only these checks.
 #
 #    hadolint        docker/Dockerfile.prod (config: .hadolint.yaml)
-#    ShellCheck      scripts/*.sh and .github/scripts/*.sh (preinstalled on the runner)
+#    ShellCheck      every tracked *.sh file (preinstalled on the runner)
 #    actionlint      .github/workflows/* (config: .github/actionlint.yaml)
 #    zizmor          GitHub Actions security audit (injection, permissions, pinning)
 #    compose config  docker-compose.yml is valid and interpolates
@@ -42,7 +42,7 @@ jobs:
           config: .hadolint.yaml
 
       - name: ShellCheck
-        run: shellcheck --version | head -2 && shellcheck scripts/*.sh .github/scripts/*.sh
+        run: shellcheck --version | head -2 && git ls-files -z '*.sh' | xargs -0 shellcheck
 
       # The action downloads the actionlint binary from GitHub releases; an HTTP 5xx there
       # is a network blip, not a workflow problem. The first attempt may fail without
