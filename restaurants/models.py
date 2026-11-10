@@ -20,6 +20,10 @@ _colour_validator = RegexValidator(
 _latitude_validators = [MinValueValidator(-90), MaxValueValidator(90)]
 _longitude_validators = [MinValueValidator(-180), MaxValueValidator(180)]
 
+# Words that are routes of their own under /api/v1/restaurants/, so no restaurant can use them
+# as its slug (GET /restaurants/nearby is the nearby list, never a restaurant).
+RESERVED_SLUGS = frozenset({"nearby"})
+
 ROLE_CHOICES = [(role.value, role.value.title()) for role in Role]
 
 
@@ -98,6 +102,20 @@ class Restaurant(BaseModel):
 
     def __str__(self) -> str:
         return self.name_en
+
+    def clean(self) -> None:
+        super().clean()
+        self._check_slug()
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        self._check_slug()
+        super().save(*args, **kwargs)
+
+    def _check_slug(self) -> None:
+        if self.slug in RESERVED_SLUGS:
+            raise ValidationError(
+                {"slug": f"'{self.slug}' is reserved; choose another."}
+            )
 
 
 class RestaurantMenuImage(RestaurantOwnedModel):
