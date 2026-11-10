@@ -18,6 +18,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0007](0007-api-shape-conventions.md) | API shape: polling lists, paths without a trailing slash, public endpoints | accepted |
 | [0008](0008-public-visibility-and-flags.md) | What a customer can see: `is_open`, suspended restaurants and `ai_enabled` | accepted |
 | [0009](0009-api-hardening-and-outbox-hygiene.md) | API hardening baseline (request id, no-store, body cap) and outbox hygiene | accepted |
+| [0010](0010-the-assistant-layer.md) | The assistant layer: one adapter interface, validated outputs, no content in logs | accepted |
 
 ## Writing a record
 
