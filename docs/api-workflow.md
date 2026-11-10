@@ -83,8 +83,10 @@ docker compose -f tools/api-tools/docker-compose.yml run --rm -v /tmp:/base:ro o
   changelog /base/base.yaml openapi/schema.yaml --format markdown
 ```
 
-`scripts/schema.sh` needs no database. The schema is **not served** by the application:
-nothing is exposed in production unless a project adds a schema view on purpose.
+`scripts/schema.sh` needs no database. The running application serves the schema and Swagger UI **only on local and
+staging** and only to staff accounts (`/api/schema/` and `/api/docs/`: sign in through the Django admin first, anyone
+else gets a `404`, so nothing reveals where the admin is). Production serves neither: its contract is the
+`openapi.yaml` attached to each release. The routes are in `config/api_docs.py`.
 
 ## Not part of this workflow
 

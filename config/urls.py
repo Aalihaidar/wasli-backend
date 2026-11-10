@@ -16,12 +16,13 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 
 from .api_docs import docs_urlpatterns
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/v1/", include("config.api_urls")),
     # Swagger UI and the live schema: staff only, local and staging only (config/api_docs.py).
     *docs_urlpatterns(),
 ]

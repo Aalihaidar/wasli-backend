@@ -74,7 +74,7 @@ The checklist of everything to do in this repository, from a fresh copy of the t
 - [ ] Set `CORS_ALLOWED_ORIGINS` for the web client (development and production)
 - [ ] Create the first app, with its model, serializer, view, URL under `/api/v1/` and tests
 - [ ] Generate and commit the API contract (`bash scripts/schema.sh generate`), which switches on the three API CI jobs
-- [ ] Add both the backend and the client owners to `/openapi/` and `/.spectral.yaml` in `.github/CODEOWNERS`
+- [x] Add both the backend and the client owners to `/openapi/` and `/.spectral.yaml` in `.github/CODEOWNERS` (the owner is both; `@Aalihaidar` owns both paths)
 - [ ] Publish the first release: raise the `version` in `pyproject.toml`, merge `develop` into `main` through a release pull request, then publish the draft release
 
 ## 8. Later
@@ -126,9 +126,12 @@ The sections below take the project from the finished scaffold to the complete f
 - [ ] Customer accounts: sign-up with a name, an email or a phone number and a password, a six-digit verification code (stored hashed, 10 minutes, five attempts, resend limit) sent through the messaging interface, verify (issues the customer token), resend, sign-in, sign-out, `GET /api/v1/customers/me`, adding the missing contact from the account settings (an email for a phone sign-up, a phone number for an email sign-up) with a code sent to it (changing an existing contact is not offered), and password reset, all throttled, with tests (an unverified account cannot sign in; another account's code never works). The endpoint shapes are agreed first in an API request issue
 - [ ] Media storage: `django-storages` with Cloudflare R2 (S3 API); image fields uploaded in the admin for logo, cover, menu images and item photos (the fields exist on the models and use the default file storage until this step switches it to R2); absolute URLs in the API from a public base URL; one bucket and one key pair per environment; settings in `.env.example` and `docker-compose.yml`; tested with a fake storage
 - [ ] **Needs the owner:** an R2 bucket and an access key for staging on the existing Cloudflare account, with the public `r2.dev` address enabled until a domain exists
-- [ ] `GET /api/v1/config` (location check, screen-online requirement, assistant availability, languages), with tests
-- [ ] `GET /api/v1/restaurants/nearby` (distance, `is_open`, `nearest` hint) and `GET /api/v1/restaurants/{slug}` (menu images and structured menu), with tests
-- [ ] Generate and commit `openapi/schema.yaml` (`bash scripts/schema.sh generate`) with the `api-change` label, and add the backend and client owners to `/openapi/` and `/.spectral.yaml` in `.github/CODEOWNERS`
+- [x] `GET /api/v1/config` (location check, screen-online requirement, assistant availability, languages, polling interval), with tests; `ai_enabled` is true for the fake provider, and for Gemini when its key and model are set (the daily budget and the outage window come with the assistant layer in D3)
+- [x] `GET /api/v1/restaurants/nearby` (distance, `is_open`, `nearest` hint) and `GET /api/v1/restaurants/{slug}` (menu images and structured menu), with tests; `is_open` is true while the restaurant's site polled in the last 60 seconds, `nearby` is not paginated (polling list), `nearby` is a reserved slug, and a restaurant that is inactive or whose subscription is suspended is not listed and its page is a 404
+- [x] Gunicorn access log without the query string: the production entrypoint logs the method, the path, the status, the size, the time and the request id, never the full request line, because `GET /restaurants/nearby` carries the customer's position in its query string; tested. Remove `GUNICORN_CMD_ARGS` from the Render variables if it is set there, because it replaces these defaults
+- [x] Generate and commit `openapi/schema.yaml` (`bash scripts/schema.sh generate`) with the `api-change` label (the three public endpoints; Swagger on staging shows it)
+- [x] The backend and client owners on `/openapi/` and `/.spectral.yaml` in `.github/CODEOWNERS`: the owner is both, and `@Aalihaidar` already owns both paths
+- [x] Decision records: `docs/adr/` with an index and the first eight records (accounts, roles and tenancy, environments and deploys, no demo mode, R2 images, customer accounts and the outbox, API shape, public visibility); a new decision that is costly to change gets a record in the same pull request
 - [ ] Adapter interface and Gemini adapter, then a developer-only spike command for order parsing, car-details extraction and transcription in Arabic, English and mixed input
 - [ ] **Needs the owner:** a Gemini key for a project made for Wasli, and the WAV clips the frontend records in Chrome on Android and Safari on iPhone
 - [ ] Run the spike and report the model chosen, its free daily quota, the latency per call and which audio formats worked

@@ -1,0 +1,686 @@
+openapi: 3.0.3
+info:
+  title: Wasli API
+  version: 0.1.0
+  description: 'The HTTP API of Wasli: order from the car through a chat with the
+    restaurant.'
+paths:
+  /api/v1/config:
+    get:
+      operationId: config_retrieve
+      description: 'The switches the apps need before anything else: the location
+        rule, whether a restaurant must be online to be listed, whether the assistant
+        is available, the languages and the polling interval. No token is needed.'
+      summary: Read the public configuration
+      tags:
+      - config
+      security:
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error400Response'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error409Response'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Config'
+          description: ''
+  /api/v1/restaurants/{slug}:
+    get:
+      operationId: restaurants_retrieve
+      description: The restaurant's names, logo, brand colour, position and parking
+        lot, the menu images the chat sends, and the structured menu (categories,
+        items, option groups and options with their availability) that the item picker
+        uses. A restaurant that is not active or whose subscription is suspended is
+        a `404`. No token is needed.
+      summary: Read a restaurant and its menu
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - restaurants
+      security:
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error400Response'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse404'
+              examples:
+                NotFound:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_found
+                      detail: Not found.
+                      attr: null
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error409Response'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantDetail'
+          description: ''
+  /api/v1/restaurants/nearby:
+    get:
+      operationId: restaurants_nearby
+      description: Visible restaurants (active, subscription not suspended) whose
+        parking lot is in range of the point (within the lot's radius of its centre),
+        nearest first. `distance_m` is the distance to the restaurant itself. When
+        none is in range, `restaurants` is empty and `nearest` holds the closest active
+        restaurant. This list is polled and is not paginated. No token is needed.
+      summary: List the restaurants around a point
+      parameters:
+      - in: query
+        name: lat
+        schema:
+          type: number
+          format: double
+        description: Latitude of the customer, in degrees.
+        required: true
+      - in: query
+        name: lng
+        schema:
+          type: number
+          format: double
+        description: Longitude of the customer, in degrees.
+        required: true
+      tags:
+      - restaurants
+      security:
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error400Response'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error409Response'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse429'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NearbyResponse'
+          description: ''
+components:
+  schemas:
+    ClientErrorEnum:
+      enum:
+      - client_error
+      type: string
+      description: '* `client_error` - Client Error'
+    Config:
+      type: object
+      properties:
+        location_check:
+          allOf:
+          - $ref: '#/components/schemas/LocationCheckEnum'
+          description: |-
+            How an order's location is checked: `off`, `warn` (recorded, never blocks) or `enforce`.
+
+            * `off` - off
+            * `warn` - warn
+            * `enforce` - enforce
+        require_screen_online:
+          type: boolean
+          description: 'True: a restaurant is listed only while its site is online.'
+        ai_enabled:
+          type: boolean
+          description: 'False when the assistant is not available: use the item picker.'
+        languages:
+          type: array
+          items:
+            $ref: '#/components/schemas/LanguagesEnum'
+          description: The languages of the product.
+        poll_interval_seconds:
+          type: integer
+          description: How often the sites poll for new messages and orders.
+      required:
+      - ai_enabled
+      - languages
+      - location_check
+      - poll_interval_seconds
+      - require_screen_online
+    Error400:
+      type: object
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+        attr:
+          type: string
+          nullable: true
+      required:
+      - attr
+      - code
+      - detail
+    Error400Response:
+      type: object
+      description: '``validation_error``: invalid input. ``client_error``: an unreadable
+        request body.'
+      properties:
+        type:
+          $ref: '#/components/schemas/Error400ResponseTypeEnum'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error400'
+      required:
+      - errors
+      - type
+    Error400ResponseTypeEnum:
+      enum:
+      - validation_error
+      - client_error
+      type: string
+      description: |-
+        * `validation_error` - Validation Error
+        * `client_error` - Client Error
+    Error404:
+      type: object
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode404Enum'
+        detail:
+          type: string
+        attr:
+          type: string
+          nullable: true
+      required:
+      - attr
+      - code
+      - detail
+    Error409:
+      type: object
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode409Enum'
+        detail:
+          type: string
+        attr:
+          type: string
+          nullable: true
+      required:
+      - attr
+      - code
+      - detail
+    Error409Response:
+      type: object
+      description: '``409``: the request is valid but conflicts with the current state.'
+      properties:
+        type:
+          $ref: '#/components/schemas/ClientErrorEnum'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error409'
+      required:
+      - errors
+      - type
+    Error429:
+      type: object
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode429Enum'
+        detail:
+          type: string
+        attr:
+          type: string
+          nullable: true
+      required:
+      - attr
+      - code
+      - detail
+    ErrorCode404Enum:
+      enum:
+      - not_found
+      type: string
+      description: '* `not_found` - Not Found'
+    ErrorCode409Enum:
+      enum:
+      - order_invalid_transition
+      type: string
+      description: '* `order_invalid_transition` - Order Invalid Transition'
+    ErrorCode429Enum:
+      enum:
+      - throttled
+      type: string
+      description: '* `throttled` - Throttled'
+    ErrorResponse404:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/ClientErrorEnum'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error404'
+      required:
+      - errors
+      - type
+    ErrorResponse429:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/ClientErrorEnum'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error429'
+      required:
+      - errors
+      - type
+    LanguagesEnum:
+      enum:
+      - en
+      - ar
+      type: string
+      description: |-
+        * `en` - en
+        * `ar` - ar
+    LocationCheckEnum:
+      enum:
+      - 'off'
+      - warn
+      - enforce
+      type: string
+      description: |-
+        * `off` - off
+        * `warn` - warn
+        * `enforce` - enforce
+    MenuCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name_en:
+          type: string
+          readOnly: true
+        name_ar:
+          type: string
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuItem'
+          readOnly: true
+      required:
+      - id
+      - items
+      - name_ar
+      - name_en
+    MenuImage:
+      type: object
+      properties:
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        caption_en:
+          type: string
+          readOnly: true
+        caption_ar:
+          type: string
+          readOnly: true
+      required:
+      - caption_ar
+      - caption_en
+      - image_url
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name_en:
+          type: string
+          readOnly: true
+        name_ar:
+          type: string
+          readOnly: true
+        description_en:
+          type: string
+          readOnly: true
+        description_ar:
+          type: string
+          readOnly: true
+        price_minor:
+          type: integer
+          readOnly: true
+          description: 'In fils: 1250 is 12.50 AED.'
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        is_available:
+          type: boolean
+          readOnly: true
+        option_groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptionGroup'
+          readOnly: true
+      required:
+      - description_ar
+      - description_en
+      - id
+      - image_url
+      - is_available
+      - name_ar
+      - name_en
+      - option_groups
+      - price_minor
+    NearbyResponse:
+      type: object
+      properties:
+        restaurants:
+          type: array
+          items:
+            $ref: '#/components/schemas/NearbyRestaurant'
+        nearest:
+          allOf:
+          - $ref: '#/components/schemas/NearestRestaurant'
+          nullable: true
+          description: 'Only when `restaurants` is empty: the closest active restaurant,
+            so the app can say how far it is. `null` otherwise.'
+      required:
+      - nearest
+      - restaurants
+    NearbyRestaurant:
+      type: object
+      properties:
+        slug:
+          type: string
+        name_en:
+          type: string
+        name_ar:
+          type: string
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        distance_m:
+          type: integer
+          description: Metres from the customer to the restaurant.
+        is_open:
+          type: boolean
+          description: True while the restaurant's site is online and can take an
+            order.
+      required:
+      - distance_m
+      - is_open
+      - latitude
+      - logo_url
+      - longitude
+      - name_ar
+      - name_en
+      - slug
+    NearestRestaurant:
+      type: object
+      properties:
+        slug:
+          type: string
+        name_en:
+          type: string
+        name_ar:
+          type: string
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        distance_m:
+          type: integer
+          description: Metres from the customer to the restaurant.
+        is_open:
+          type: boolean
+          description: True while the restaurant's site is online and can take an
+            order.
+        parking_lot:
+          allOf:
+          - $ref: '#/components/schemas/ParkingLot'
+          readOnly: true
+      required:
+      - distance_m
+      - is_open
+      - latitude
+      - logo_url
+      - longitude
+      - name_ar
+      - name_en
+      - parking_lot
+      - slug
+    Option:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name_en:
+          type: string
+          readOnly: true
+        name_ar:
+          type: string
+          readOnly: true
+        price_delta_minor:
+          type: integer
+          readOnly: true
+          description: 'In fils, added to the item''s price: 200 is +2.00 AED.'
+        is_available:
+          type: boolean
+          readOnly: true
+        is_default:
+          type: boolean
+          readOnly: true
+      required:
+      - id
+      - is_available
+      - is_default
+      - name_ar
+      - name_en
+      - price_delta_minor
+    OptionGroup:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name_en:
+          type: string
+          readOnly: true
+        name_ar:
+          type: string
+          readOnly: true
+        min_select:
+          type: integer
+          readOnly: true
+        max_select:
+          type: integer
+          readOnly: true
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/Option'
+          readOnly: true
+      required:
+      - id
+      - max_select
+      - min_select
+      - name_ar
+      - name_en
+      - options
+    ParkingLot:
+      type: object
+      properties:
+        name:
+          type: string
+          readOnly: true
+        latitude:
+          type: number
+          format: double
+          readOnly: true
+        longitude:
+          type: number
+          format: double
+          readOnly: true
+        radius_m:
+          type: integer
+          readOnly: true
+      required:
+      - latitude
+      - longitude
+      - name
+      - radius_m
+    RestaurantDetail:
+      type: object
+      properties:
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        name_en:
+          type: string
+          readOnly: true
+        name_ar:
+          type: string
+          readOnly: true
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        brand_colour:
+          type: string
+          description: A hex colour such as `#1A73E8`, or empty when none is set.
+        latitude:
+          type: number
+          format: double
+          readOnly: true
+        longitude:
+          type: number
+          format: double
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        parking_lot:
+          allOf:
+          - $ref: '#/components/schemas/ParkingLot'
+          readOnly: true
+        menu_images:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuImage'
+          readOnly: true
+        menu:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuCategory'
+          readOnly: true
+      required:
+      - brand_colour
+      - currency
+      - latitude
+      - logo_url
+      - longitude
+      - menu
+      - menu_images
+      - name_ar
+      - name_en
+      - parking_lot
+      - slug

@@ -1,6 +1,7 @@
 """Swagger UI and the live schema: for staff only, bundled, never in production."""
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -16,6 +17,7 @@ pytestmark = [
     pytest.mark.urls("config.tests.docs_urls"),
 ]
 
+COMMITTED_SCHEMA = Path(__file__).resolve().parents[2] / "openapi" / "schema.yaml"
 DOCS = "/api/docs/"
 SCHEMA = "/api/schema/"
 JSON = {"Accept": "application/vnd.oai.openapi+json"}
@@ -121,6 +123,29 @@ def test_the_schema_is_served_as_json_and_names_the_project(
     assert response.status_code == 200
     assert document["info"]["title"] == "Wasli API"
     assert document["openapi"].startswith("3.")
+
+
+def test_the_served_schema_is_the_committed_contract(staff_client: Client) -> None:
+    response = staff_client.get(SCHEMA)
+
+    assert response.status_code == 200
+    assert response.content.decode() == COMMITTED_SCHEMA.read_text()
+
+
+def test_the_public_endpoints_are_documented_without_a_token(
+    staff_client: Client,
+) -> None:
+    document = json.loads(staff_client.get(SCHEMA, headers=JSON).content)
+
+    for path in (
+        "/api/v1/config",
+        "/api/v1/restaurants/nearby",
+        "/api/v1/restaurants/{slug}",
+    ):
+        operation = document["paths"][path]["get"]
+        assert operation["security"] == [{}]
+        assert operation["operationId"]
+        assert operation["description"]
 
 
 def test_the_docs_do_not_describe_themselves(staff_client: Client) -> None:

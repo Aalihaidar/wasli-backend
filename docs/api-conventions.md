@@ -11,6 +11,9 @@ Version in the path: `/api/v1/...`. A breaking change gets a new version (`/api/
 the old one (see `docs/api-workflow.md`). The `SCHEMA_PATH_PREFIX` setting already keeps the
 version out of operation ids and tags.
 
+Paths have no trailing slash (`/api/v1/config`, `/api/v1/restaurants/{slug}`), as in the contract the two
+teams agreed. A request with a trailing slash is a `404`.
+
 ## One error body
 
 Every error raised inside a DRF view has the same body, so a client has a single error parser. The

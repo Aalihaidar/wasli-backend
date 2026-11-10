@@ -1,0 +1,8 @@
+"""Every route under ``/api/v1/``. Each app owns its own ``urls.py``."""
+
+from django.urls import include, path
+
+urlpatterns = [
+    path("", include("core.urls")),
+    path("", include("restaurants.urls")),
+]
