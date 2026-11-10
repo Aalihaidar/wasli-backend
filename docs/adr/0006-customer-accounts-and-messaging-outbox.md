@@ -1,6 +1,6 @@
 # ADR 0006: Customer accounts with a verification code, and the messaging outbox
 
-- Status: accepted; the outbox is built, the account endpoints are not
+- Status: accepted; the outbox and the account endpoints are built (the flow is in [ADR 0011](0011-customer-accounts-flow.md))
 - Date: 2026-11-07
 
 ## Context
