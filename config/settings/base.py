@@ -17,6 +17,7 @@ import dj_database_url
 from corsheaders.defaults import default_headers
 
 from config.env import env_bool, env_choice, env_int
+from config.storage import media_storage
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -345,8 +346,12 @@ REQUEST_BODY_LIMITS: list[tuple[str, int, str]] = [
 # Django 6 Content Security Policy — the policy itself is set per environment
 # (report-only in production.py until it has been tuned for the project).
 MIDDLEWARE.append("django.middleware.csp.ContentSecurityPolicyMiddleware")
+# Where uploaded images are kept (config/storage.py): the local disk, or the R2 bucket of this
+# environment. A service on an ephemeral disk (Render) must use r2, or uploads disappear at the
+# next deploy; a system check warns about it (core/checks.py).
+MEDIA_STORAGE = env_choice("MEDIA_STORAGE", "filesystem", {"filesystem", "r2"})
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": media_storage(MEDIA_STORAGE, os.environ),
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
     },
