@@ -7,9 +7,11 @@ work. Production backends (Resend for email, an SMS provider) are added here lat
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 
 from .models import OutboxMessage
 
@@ -29,6 +31,27 @@ class MessagingBackend(ABC):
     @abstractmethod
     def send(self, message: OutgoingMessage) -> None:
         """Deliver one message, or raise when it cannot be delivered."""
+
+
+def purge_old_messages(now: datetime | None = None) -> int:
+    """Delete outbox messages older than ``OUTBOX_RETENTION_HOURS``; returns how many.
+
+    The stored bodies hold plain verification codes, so they are not kept: the owner reads a
+    code within minutes of asking for it.
+    """
+    cutoff = (now or timezone.now()) - timedelta(hours=settings.OUTBOX_RETENTION_HOURS)
+    deleted, _ = OutboxMessage.objects.filter(created_at__lt=cutoff).delete()
+    return deleted
+
+
+class DisabledBackend(MessagingBackend):
+    """Sends nothing: every send fails loudly. Production uses it until a real backend
+    (Resend for email, an SMS provider) exists, so no code is ever lost silently."""
+
+    def send(self, message: OutgoingMessage) -> None:
+        raise ImproperlyConfigured(
+            "Messaging is disabled (MESSAGING_BACKEND=disabled): no email or SMS can be sent."
+        )
 
 
 class OutboxBackend(MessagingBackend):
@@ -55,9 +78,14 @@ class OutboxBackend(MessagingBackend):
         )
         row.full_clean()
         row.save()
+        # No scheduler runs on the free staging service, so each send tidies the table.
+        purge_old_messages()
 
 
-BACKENDS: dict[str, type[MessagingBackend]] = {"outbox": OutboxBackend}
+BACKENDS: dict[str, type[MessagingBackend]] = {
+    "outbox": OutboxBackend,
+    "disabled": DisabledBackend,
+}
 
 
 def get_backend() -> MessagingBackend:

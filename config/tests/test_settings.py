@@ -20,3 +20,10 @@ def test_log_lines_name_the_environment() -> None:
     log_format = logging_config["formatters"]["plain"]["format"]
 
     assert f"[{settings.ENVIRONMENT}]" in log_format
+
+
+def test_log_lines_carry_the_request_id() -> None:
+    logging_config = cast("dict[str, Any]", settings.LOGGING)
+
+    assert "[{request_id}]" in logging_config["formatters"]["plain"]["format"]
+    assert logging_config["handlers"]["console"]["filters"] == ["request_id"]
