@@ -1,10 +1,22 @@
+from datetime import timedelta
+from io import StringIO
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from customers.tests.factories import PASSWORD
-from messaging.backends import OutboxBackend, OutgoingMessage, get_backend
+from messaging.backends import (
+    DisabledBackend,
+    OutboxBackend,
+    OutgoingMessage,
+    get_backend,
+    purge_old_messages,
+)
+from messaging.checks import check_outbox_not_in_production
 from messaging.models import Channel, OutboxMessage, Purpose
 from messaging.services import send_message
 from users.models import User
@@ -186,3 +198,110 @@ class TestAdmin:
         assert admin_client.get(url).status_code == 403
         admin_client.post(url, {"post": "yes"})
         assert OutboxMessage.objects.filter(pk=message.pk).exists()
+
+
+class TestDisabledBackend:
+    def test_the_setting_can_choose_it(self, settings: object) -> None:
+        settings.MESSAGING_BACKEND = "disabled"  # type: ignore[attr-defined]
+
+        assert isinstance(get_backend(), DisabledBackend)
+
+    @pytest.mark.parametrize("environment", ["local", "staging", "production"])
+    def test_every_send_fails_loudly_and_stores_nothing(
+        self, settings: object, environment: str
+    ) -> None:
+        settings.MESSAGING_BACKEND = "disabled"  # type: ignore[attr-defined]
+        settings.ENVIRONMENT = environment  # type: ignore[attr-defined]
+
+        with pytest.raises(ImproperlyConfigured, match="disabled"):
+            send_message(
+                Channel.EMAIL, "sara@example.com", "Code 1", Purpose.VERIFICATION
+            )
+
+        assert not OutboxMessage.objects.exists()
+
+
+class TestProductionCheck:
+    def test_the_outbox_in_production_is_a_system_error(self, settings: object) -> None:
+        settings.ENVIRONMENT = "production"  # type: ignore[attr-defined]
+        settings.MESSAGING_BACKEND = "outbox"  # type: ignore[attr-defined]
+
+        [error] = check_outbox_not_in_production(None)
+
+        assert error.id == "messaging.E001"
+        assert "disabled" in (error.hint or "")
+
+    @pytest.mark.parametrize(
+        ("environment", "backend"),
+        [
+            ("production", "disabled"),
+            ("staging", "outbox"),
+            ("local", "outbox"),
+            ("local", "disabled"),
+        ],
+    )
+    def test_every_other_combination_passes(
+        self, settings: object, environment: str, backend: str
+    ) -> None:
+        settings.ENVIRONMENT = environment  # type: ignore[attr-defined]
+        settings.MESSAGING_BACKEND = backend  # type: ignore[attr-defined]
+
+        assert check_outbox_not_in_production(None) == []
+
+    def test_the_check_is_registered_with_django(self, settings: object) -> None:
+        from django.core.management import CommandError
+
+        settings.ENVIRONMENT = "production"  # type: ignore[attr-defined]
+        settings.MESSAGING_BACKEND = "outbox"  # type: ignore[attr-defined]
+
+        with pytest.raises(CommandError, match=r"messaging\.E001"):
+            call_command("check", tags=["security"])
+
+
+class TestRetention:
+    def age(self, message: OutboxMessage, hours: int) -> None:
+        OutboxMessage.objects.filter(pk=message.pk).update(
+            created_at=timezone.now() - timedelta(hours=hours)
+        )
+
+    def test_old_messages_are_deleted_and_recent_ones_kept(
+        self, settings: object
+    ) -> None:
+        settings.OUTBOX_RETENTION_HOURS = 24  # type: ignore[attr-defined]
+        old, recent = make_message(body="old"), make_message(body="recent")
+        self.age(old, 25)
+        self.age(recent, 23)
+
+        assert purge_old_messages() == 1
+
+        assert list(OutboxMessage.objects.all()) == [recent]
+
+    def test_the_retention_is_a_setting(self, settings: object) -> None:
+        settings.OUTBOX_RETENTION_HOURS = 2  # type: ignore[attr-defined]
+        message = make_message()
+        self.age(message, 3)
+
+        assert purge_old_messages() == 1
+
+    def test_each_send_tidies_the_table(self, settings: object) -> None:
+        settings.OUTBOX_RETENTION_HOURS = 24  # type: ignore[attr-defined]
+        old = make_message(body="old code 111111")
+        self.age(old, 48)
+
+        send_message(
+            Channel.EMAIL, "sara@example.com", "new code", Purpose.VERIFICATION
+        )
+
+        assert list(OutboxMessage.objects.values_list("body", flat=True)) == [
+            "new code"
+        ]
+
+    def test_the_command_purges_on_demand(self, settings: object) -> None:
+        settings.OUTBOX_RETENTION_HOURS = 24  # type: ignore[attr-defined]
+        self.age(make_message(), 30)
+        out = StringIO()
+
+        call_command("purge_outbox", stdout=out)
+
+        assert "Deleted 1 outbox message(s)." in out.getvalue()
+        assert not OutboxMessage.objects.exists()

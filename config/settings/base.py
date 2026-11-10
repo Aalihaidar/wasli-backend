@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from corsheaders.defaults import default_headers
 
 from config.env import env_bool, env_choice, env_int
 
@@ -145,6 +146,10 @@ CORS_ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
+# The browser apps read the request id of a failed call and send their own.
+CORS_EXPOSE_HEADERS = ["Retry-After", "X-Request-ID"]
+CORS_ALLOW_HEADERS = [*default_headers, "x-request-id"]
+
 # ── Wasli settings ───────────────────────────────────────────────────────
 # Read from the environment (docker-compose.yml / .env locally, the Render service in
 # production); a bad value stops start-up (config/env.py). Differences between environments
@@ -156,7 +161,13 @@ ENVIRONMENT = env_choice("ENVIRONMENT", "local", {"local", "staging", "productio
 LOCATION_CHECK = env_choice("LOCATION_CHECK", "warn", {"off", "warn", "enforce"})
 # How outgoing email and SMS leave the system (messaging/backends.py). "outbox" stores them
 # in the database for the owner to read in the admin; it refuses to run in production.
-MESSAGING_BACKEND = env_choice("MESSAGING_BACKEND", "outbox", {"outbox"})
+# "disabled" sends nothing and refuses every send: production uses it until a real backend
+# exists, so no customer can sign up there. The outbox is refused in production by a system
+# check (messaging/checks.py).
+MESSAGING_BACKEND = env_choice("MESSAGING_BACKEND", "outbox", {"outbox", "disabled"})
+# Outbox messages hold plain verification codes, so they are deleted after this many hours
+# (each send deletes the older ones; python manage.py purge_outbox does it on demand).
+OUTBOX_RETENTION_HOURS = env_int("OUTBOX_RETENTION_HOURS", 24, minimum=1)
 # True: list a restaurant only while its site polled in the last 60 seconds.
 REQUIRE_SCREEN_ONLINE = env_bool("REQUIRE_SCREEN_ONLINE", default=False)
 # The assistant layer only understands input (orders, car details, voice); it never writes
@@ -211,9 +222,9 @@ AUTHENTICATION_BACKENDS = ["users.backends.IdentifierBackend"]
 
 # ── API contract (drf-spectacular) ───────────────────────────────────────
 # openapi/schema.yaml is generated from the code (bash scripts/schema.sh generate)
-# and committed; it is the contract with every API client. The schema is NOT
-# served by the app: no SpectacularAPIView is wired into the URLconf, so
-# nothing is exposed in production unless the project adds it on purpose.
+# and committed; it is the contract with every API client. The running app serves the schema
+# and Swagger UI (config/api_docs.py) only on local and staging and only to staff accounts;
+# production serves neither, so nothing is exposed there.
 #
 # One error body for every API error (drf-standardized-errors): {"type", "errors": [{"code",
 # "detail", "attr"}]}. Its AutoSchema documents the error responses of each operation, so
@@ -311,6 +322,26 @@ MIDDLEWARE.insert(
 )
 # /healthz answers before host validation and HTTPS redirects (config/health.py).
 MIDDLEWARE.insert(0, "config.health.HealthCheckMiddleware")
+# The API baseline (config/middleware.py): the request id wraps everything, including CORS
+# answers; no-store and the body-size cap sit right after CORS so a refused request still
+# carries the CORS headers the browser app needs to read the error.
+_CORS_AT = MIDDLEWARE.index("corsheaders.middleware.CorsMiddleware")
+MIDDLEWARE[_CORS_AT + 1 : _CORS_AT + 1] = [
+    "config.middleware.NoStoreMiddleware",
+    "config.middleware.RequestSizeMiddleware",
+]
+MIDDLEWARE.insert(_CORS_AT, "config.middleware.RequestIdMiddleware")
+# The largest request body of the API, in bytes (a chat message is at most 500 characters).
+# A path with its own limit is listed with the error code that refuses a larger body.
+REQUEST_BODY_MAX_BYTES = 64 * 1024
+REQUEST_BODY_LIMITS: list[tuple[str, int, str]] = [
+    # A voice note: one clip of at most 5 MB plus the multipart framing.
+    (
+        r"/api/v1/conversations/[0-9a-fA-F-]{36}/voice",
+        6 * 1024 * 1024,
+        "audio_too_large",
+    ),
+]
 # Django 6 Content Security Policy — the policy itself is set per environment
 # (report-only in production.py until it has been tuned for the project).
 MIDDLEWARE.append("django.middleware.csp.ContentSecurityPolicyMiddleware")
@@ -336,14 +367,24 @@ CELERY_TIMEZONE = TIME_ZONE
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {"()": "config.logging_filters.RequestIdFilter"},
+    },
     "formatters": {
         "plain": {
-            "format": f"{{asctime}} [{ENVIRONMENT}] {{levelname}} {{name}}: {{message}}",
+            "format": (
+                f"{{asctime}} [{ENVIRONMENT}] {{levelname}} {{name}} "
+                "[{request_id}]: {message}"
+            ),
             "style": "{",
         },
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "plain",
+            "filters": ["request_id"],
+        },
     },
     "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
     "loggers": {
