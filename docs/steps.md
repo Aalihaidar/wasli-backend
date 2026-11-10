@@ -134,7 +134,7 @@ The sections below take the project from the finished scaffold to the complete f
 - [x] Decision records: `docs/adr/` with an index and the first eight records (accounts, roles and tenancy, environments and deploys, no demo mode, R2 images, customer accounts and the outbox, API shape, public visibility); a new decision that is costly to change gets a record in the same pull request
 - [x] API hardening baseline: `X-Request-ID` on every API response and in every log line, `Cache-Control: no-store` on `/api/v1/`, a request body cap (64 KB, 6 MB for a voice upload) refused with `request_too_large` or `audio_too_large` before any view, CORS exposing and allowing the request id; tested ([ADR 0009](adr/0009-api-hardening-and-outbox-hygiene.md))
 - [x] Outbox hygiene: messages deleted after 24 hours (on every send and with `python manage.py purge_outbox`), the `disabled` messaging backend, and the system check `messaging.E001` that fails when `ENVIRONMENT=production` uses the outbox; tested
-- [ ] Adapter interface and Gemini adapter, then a developer-only spike command for order parsing, car-details extraction and transcription in Arabic, English and mixed input
+- [x] Adapter interface and Gemini adapter, then a developer-only spike command for order parsing, car-details extraction and transcription in Arabic, English and mixed input (`assistant/adapters/`, `python manage.py assistant_spike`, [ADR 0010](adr/0010-the-assistant-layer.md); written and tested against a stand-in client, not yet run against the real provider)
 - [ ] **Needs the owner:** a Gemini key for a project made for Wasli, and the WAV clips the frontend records in Chrome on Android and Safari on iPhone
 - [ ] Run the spike and report the model chosen, its free daily quota, the latency per call and which audio formats worked
 - [ ] Publish release `v0.1.0` (raise the version, release pull request, publish the draft) and tell the frontend team which release to pin
@@ -142,7 +142,8 @@ The sections below take the project from the finished scaffold to the complete f
 
 ## 11. D2: the conversation engine
 
-- [ ] `assistant`: fake adapter with recorded outputs (used by every test), prompts, call logging, and the availability flag (false for 5 minutes after a provider failure)
+- [x] `assistant`: fake adapter with recorded outputs (used by every test), prompts and call logging (one `AICallLog` row per call, never the content)
+- [ ] `assistant`: the availability flag (`ai_available` false for 5 minutes after a provider failure)
 - [ ] `orders/services.py`: validation and pricing from the database (availability, option rules, default options, limits of 20 lines and quantity 20), unit-tested
 - [ ] `chat/texts.py`: every bot text in Arabic and English, with a test that each text has both
 - [ ] `chat/engine.py`: welcome, menu images and first question, then the ordering loop (item actions applied, ids validated, unmatched items, choice questions and `choose`, empty order, cancel and `restart`)
