@@ -59,6 +59,14 @@ x-dev-image: &dev-image
     LOCATION_CHECK: ${LOCATION_CHECK:-warn}
     MESSAGING_BACKEND: ${MESSAGING_BACKEND:-outbox}
     OUTBOX_RETENTION_HOURS: ${OUTBOX_RETENTION_HOURS:-24}
+    # Uploaded images: the local disk by default; set MEDIA_STORAGE=r2 and the R2_* values in .env
+    # to use the staging bucket from the dev container.
+    MEDIA_STORAGE: ${MEDIA_STORAGE:-filesystem}
+    R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+    R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+    R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+    R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
+    R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
     REQUIRE_SCREEN_ONLINE: ${REQUIRE_SCREEN_ONLINE:-false}
     AI_PROVIDER: ${AI_PROVIDER:-fake}
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}

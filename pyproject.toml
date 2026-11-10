@@ -8,6 +8,7 @@ dependencies = [
     "django>=6.0.9",
     "django-celery-beat>=2.9.0",
     "django-cors-headers>=4.9.0",
+    "django-storages[s3]>=1.14.6",
     "djangorestframework>=3.18.3",
     "drf-spectacular>=0.30.0",
     "drf-spectacular-sidecar>=2026.10.1",
@@ -60,10 +61,10 @@ plugins = ["mypy_django_plugin.main"]
 exclude = ['^\.venv/', '/migrations/']
 
 # django-stubs resolves the whole app registry for AUTH_USER_MODEL (users.User);
-# django-celery-beat and Django REST framework ship no type stubs / py.typed marker, so
-# they're untyped either way.
+# django-celery-beat, Django REST framework and django-storages ship no type stubs / py.typed
+# marker, so they're untyped either way.
 [[tool.mypy.overrides]]
-module = ["django_celery_beat.*", "rest_framework.*"]
+module = ["django_celery_beat.*", "rest_framework.*", "storages.*"]
 ignore_missing_imports = true
 
 [tool.django-stubs]

@@ -13,7 +13,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0002](0002-roles-permissions-and-tenancy.md) | Roles, permission codes and restaurant isolation | accepted |
 | [0003](0003-environments-and-deploys.md) | Staging from `develop`, production from `main`, deploys by hand | accepted |
 | [0004](0004-no-demo-mode-and-no-seed.md) | No demo mode and no seed: data is entered in the Django admin | accepted |
-| [0005](0005-images-on-cloudflare-r2.md) | Images on Cloudflare R2, static files on WhiteNoise | accepted, not built yet |
+| [0005](0005-images-on-cloudflare-r2.md) | Images on Cloudflare R2, static files on WhiteNoise | accepted, built |
 | [0006](0006-customer-accounts-and-messaging-outbox.md) | Customer accounts with a verification code, and the messaging outbox | accepted, outbox built |
 | [0007](0007-api-shape-conventions.md) | API shape: polling lists, paths without a trailing slash, public endpoints | accepted |
 | [0008](0008-public-visibility-and-flags.md) | What a customer can see: `is_open`, suspended restaurants and `ai_enabled` | accepted |

@@ -177,6 +177,31 @@ class TestNearby:
         assert entry["logo_url"].startswith("http")
         assert entry["logo_url"].endswith("restaurants/logos/a.png")
 
+    def test_the_logo_is_the_public_address_of_the_bucket(
+        self, api: APIClient, settings: Any
+    ) -> None:
+        from config.storage import r2_storage
+
+        settings.STORAGES = {
+            **settings.STORAGES,
+            "default": r2_storage(
+                {
+                    "R2_ACCOUNT_ID": "0123456789abcdef",
+                    "R2_ACCESS_KEY_ID": "invented-access-key-id",
+                    "R2_SECRET_ACCESS_KEY": "invented-secret-access-key",
+                    "R2_BUCKET_NAME": "wasli-test-media",
+                    "R2_PUBLIC_BASE_URL": "https://pub-1234abcd.r2.dev",
+                }
+            ),
+        }
+        make_restaurant("cafe-a", lot=make_lot(), logo="restaurants/logos/a.png")
+
+        [entry] = api.get(NEARBY, INSIDE).json()["restaurants"]
+
+        assert (
+            entry["logo_url"] == "https://pub-1234abcd.r2.dev/restaurants/logos/a.png"
+        )
+
     @pytest.mark.parametrize(
         ("params", "attr", "code"),
         [
