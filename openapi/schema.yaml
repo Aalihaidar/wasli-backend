@@ -1103,46 +1103,46 @@ components:
       - errors
       - type
     ErrorCode401Enum:
-      enum:
-      - authentication_failed
-      - not_authenticated
       type: string
       description: |-
         * `authentication_failed` - Authentication Failed
         * `not_authenticated` - Not Authenticated
+      x-extensible-enum:
+      - authentication_failed
+      - not_authenticated
     ErrorCode403Enum:
-      enum:
-      - permission_denied
-      - account_not_verified
       type: string
       description: |-
         * `permission_denied` - Permission Denied
         * `account_not_verified` - Account Not Verified
+      x-extensible-enum:
+      - permission_denied
+      - account_not_verified
     ErrorCode404Enum:
-      enum:
-      - not_found
       type: string
       description: '* `not_found` - Not Found'
+      x-extensible-enum:
+      - not_found
     ErrorCode409Enum:
-      enum:
-      - order_invalid_transition
-      - account_exists
-      - contact_already_set
-      - no_pending_contact
       type: string
       description: |-
         * `order_invalid_transition` - Order Invalid Transition
         * `account_exists` - Account Exists
         * `contact_already_set` - Contact Already Set
         * `no_pending_contact` - No Pending Contact
+      x-extensible-enum:
+      - order_invalid_transition
+      - account_exists
+      - contact_already_set
+      - no_pending_contact
     ErrorCode429Enum:
-      enum:
-      - throttled
-      - too_many_attempts
       type: string
       description: |-
         * `throttled` - Throttled
         * `too_many_attempts` - Too Many Attempts
+      x-extensible-enum:
+      - throttled
+      - too_many_attempts
     ErrorResponse401:
       type: object
       properties:

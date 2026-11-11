@@ -313,8 +313,11 @@ SPECTACULAR_SETTINGS = {
         "ErrorCode429Enum": "config.api_errors.ErrorCode429Enum.choices",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
+    # The package's hook names the error-code enums; ours then makes them extensible, because the
+    # set of error codes grows with every feature (config/openapi_hooks.py).
     "POSTPROCESSING_HOOKS": [
-        "drf_standardized_errors.openapi_hooks.postprocess_schema_enums"
+        "drf_standardized_errors.openapi_hooks.postprocess_schema_enums",
+        "config.openapi_hooks.make_error_codes_extensible",
     ],
 }
 
