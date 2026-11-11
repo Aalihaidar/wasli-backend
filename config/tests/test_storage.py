@@ -1,5 +1,6 @@
 """Where uploaded images are kept: the choice, the R2 options and the public URLs."""
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -7,7 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.files.storage import InMemoryStorage, default_storage
 from storages.backends.s3 import S3Storage
 
-from config.storage import media_storage, public_host, r2_storage
+from config.storage import media_storage, public_host, public_media_sources, r2_storage
 
 R2_ENV = {
     "R2_ACCOUNT_ID": "0123456789abcdef",
@@ -121,3 +122,50 @@ def test_an_unknown_media_storage_value_stops_start_up(monkeypatch: Any) -> None
 
     with pytest.raises(ImproperlyConfigured, match="MEDIA_STORAGE"):
         env_choice("MEDIA_STORAGE", "filesystem", {"filesystem", "r2"})
+
+
+class TestPublicMediaSources:
+    def test_the_bucket_is_an_image_source_with_r2(self) -> None:
+        assert public_media_sources(r2_storage(R2_ENV)) == [
+            "https://pub-1234abcd.r2.dev"
+        ]
+
+    def test_the_local_disk_adds_nothing(self) -> None:
+        assert public_media_sources(media_storage("filesystem", {})) == []
+
+    def test_the_production_policy_allows_the_bucket_for_images(
+        self, tmp_path: Path
+    ) -> None:
+        """The admin's thumbnails and the apps' pictures come from the bucket, so the policy
+        (report-only now, enforced later) must name it. Run in a fresh interpreter: the settings
+        are read once, when Django starts."""
+        import os
+        import subprocess
+        import sys
+
+        def img_src(mode: str) -> str:
+            env = {
+                "PATH": os.environ["PATH"],
+                "HOME": str(tmp_path),
+                "SECRET_KEY": "x-test-secret-key-for-this-check-only-0123456789",
+                "DATABASE_URL": f"sqlite:///{tmp_path}/policy-check.db",
+                "MEDIA_STORAGE": mode,
+                **R2_ENV,
+            }
+            out = subprocess.run(
+                [
+                    sys.executable,
+                    "-W",
+                    "ignore",
+                    "-c",
+                    "import config.settings.production as p; print(p.SECURE_CSP_REPORT_ONLY['img-src'])",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return out.stdout
+
+        assert "https://pub-1234abcd.r2.dev" in img_src("r2")
+        assert "r2.dev" not in img_src("filesystem")

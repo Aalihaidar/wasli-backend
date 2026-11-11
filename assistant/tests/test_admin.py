@@ -63,3 +63,30 @@ def test_the_list_can_be_filtered_by_outcome(admin_client: Client) -> None:
     )
 
     assert [c.outcome for c in found] == ["timeout"]
+
+
+@pytest.mark.parametrize(
+    ("outcome", "kind", "text"),
+    [
+        ("ok", "ok", "OK"),
+        ("timeout", "warn", "Timeout"),
+        ("rate_limited", "warn", "Rate limited"),
+        ("budget_exceeded", "warn", "Daily budget exceeded"),
+        ("invalid_output", "bad", "Invalid output"),
+        ("error", "bad", "Error"),
+    ],
+)
+def test_an_outcome_has_its_colour(
+    admin_client: Client, outcome: str, kind: str, text: str
+) -> None:
+    from assistant.models import AICallLog
+
+    AICallLog.objects.create(
+        provider="fake", purpose="classify_reply", input_kind="text", outcome=outcome
+    )
+
+    page = admin_client.get(
+        reverse("admin:assistant_aicalllog_changelist")
+    ).content.decode()
+
+    assert f'<span class="wasli-badge wasli-badge--{kind}">{text}</span>' in page

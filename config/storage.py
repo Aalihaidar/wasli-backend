@@ -85,3 +85,10 @@ def media_storage(choice: str, environ: Mapping[str, str]) -> dict[str, Any]:
     if choice == "r2":
         return r2_storage(environ)
     return {"BACKEND": FILESYSTEM_BACKEND}
+
+
+def public_media_sources(storage: Mapping[str, Any]) -> list[str]:
+    """The origins uploaded images are loaded from, for the CSP ``img-src``: the bucket's public
+    address with R2, nothing for the local disk (it is the site's own origin)."""
+    host = storage.get("OPTIONS", {}).get("custom_domain")
+    return [f"https://{host}"] if host else []

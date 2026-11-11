@@ -21,6 +21,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0010](0010-the-assistant-layer.md) | The assistant layer: one adapter interface, validated outputs, no content in logs | accepted |
 | [0011](0011-customer-accounts-flow.md) | The customer-account flow: codes, limits, what an answer reveals | accepted |
 | [0012](0012-error-codes-are-an-open-set.md) | Error codes are an open set: extensible lists, not closed enums | accepted |
+| [0013](0013-django-admin-appearance.md) | How the Django admin looks: built-in polish now, a third-party theme later (options and costs) | accepted |
 
 ## Writing a record
 
