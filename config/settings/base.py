@@ -38,7 +38,8 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # Django's admin with Wasli's site as the default (config/apps.py, config/admin.py).
+    "config.apps.WasliAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -61,7 +62,8 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        # Project-level templates (the admin's branding and first page, templates/admin/).
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -122,6 +124,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+# Project-level static files (the admin stylesheet, static/admin/css/wasli.css).
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 
 # ── Environment-driven settings (scripts/init-django.sh) ─────────────────

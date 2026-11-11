@@ -26,13 +26,16 @@ timonwong
 usernamehw
 
 # Tools, services, standards
+adminlte
 autonumber
 chainctl
 chainguard
 errorlens
 ghaction
 gitleaks
+grappelli
 healthz
+jazzmin
 Mailpit
 oasdiff
 pgcli

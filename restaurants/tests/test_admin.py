@@ -119,3 +119,86 @@ def test_the_last_admin_cannot_be_deactivated_in_the_admin(
     admin.refresh_from_db()
     assert admin.is_active is True
     assert StaffMembership.objects.filter(pk=admin.pk, is_active=True).exists()
+
+
+class TestPolish:
+    """The thumbnails, the live status and the labels that make the lists readable."""
+
+    def test_the_list_shows_the_logo_the_subscription_and_whether_the_site_is_online(
+        self, admin_client: Client
+    ) -> None:
+        from django.utils import timezone
+
+        make_restaurant(
+            "cafe-a",
+            logo="restaurants/logos/a.png",
+            subscription_status="active",
+            screen_last_seen_at=timezone.now(),
+        )
+        make_restaurant("cafe-b", subscription_status="suspended")
+
+        page = admin_client.get(
+            reverse("admin:restaurants_restaurant_changelist")
+        ).content.decode()
+
+        assert 'class="wasli-thumb"' in page and "restaurants/logos/a.png" in page
+        assert 'class="wasli-empty"' in page  # the restaurant without a logo
+        assert "wasli-badge wasli-badge--ok" in page and ">Active<" in page
+        assert "wasli-badge wasli-badge--bad" in page and ">Suspended<" in page
+        assert (
+            page.count("icon-yes.svg") >= 1 and page.count("icon-no.svg") >= 1
+        )  # online or not
+
+    def test_the_name_is_still_the_link_not_the_thumbnail(
+        self, admin_client: Client
+    ) -> None:
+        restaurant = make_restaurant("cafe-a", logo="restaurants/logos/a.png")
+
+        page = admin_client.get(
+            reverse("admin:restaurants_restaurant_changelist")
+        ).content.decode()
+
+        link = reverse("admin:restaurants_restaurant_change", args=[restaurant.pk])
+        assert f'<a href="{link}">Cafe A</a>' in page
+
+    def test_the_page_previews_the_logo_and_the_cover_under_their_upload_fields(
+        self, admin_client: Client
+    ) -> None:
+        restaurant = make_restaurant(
+            "cafe-a", logo="restaurants/logos/a.png", cover="restaurants/covers/c.png"
+        )
+
+        page = admin_client.get(
+            reverse("admin:restaurants_restaurant_change", args=[restaurant.pk])
+        ).content.decode()
+
+        assert page.count("wasli-thumb--large") >= 2
+        assert page.index("restaurants/logos/a.png") < page.index(
+            "restaurants/covers/c.png"
+        )
+
+    def test_a_menu_image_is_previewed_in_the_row(self, admin_client: Client) -> None:
+        from restaurants.models import RestaurantMenuImage
+
+        restaurant = make_restaurant("cafe-a")
+        RestaurantMenuImage.objects.create(
+            restaurant=restaurant, image="restaurants/menu/1.jpg"
+        )
+
+        page = admin_client.get(
+            reverse("admin:restaurants_restaurant_change", args=[restaurant.pk])
+        ).content.decode()
+
+        assert "restaurants/menu/1.jpg" in page and 'class="wasli-thumb"' in page
+
+    def test_a_restaurant_without_images_still_opens_and_saves(
+        self, admin_client: Client
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        url = reverse("admin:restaurants_restaurant_change", args=[restaurant.pk])
+
+        assert admin_client.get(url).status_code == 200
+        assert (
+            admin_client.get(reverse("admin:restaurants_restaurant_add")).status_code
+            == 200
+        )
