@@ -37,6 +37,13 @@ template ships it with [drf-standardized-errors](https://github.com/ghazi-git/dr
 - This is **not** RFC 9457 problem details. The format is the package's own; what the contract
   gives a client is that it is documented and typed.
 
+The set of error codes is open. Every feature that can fail in a new way adds a code, and the error responses share the
+same lists, so each list (`ErrorCode<status>Enum` in the schema) is declared `x-extensible-enum`, not `enum`
+(`config/openapi_hooks.py`): adding a code is not a breaking change, and the contract check does not fail on it. A client
+treats a code it does not know as a generic failure of the HTTP status, and a generated client keeps the code as a string.
+The description of each list still names every code. Other enums (a language, a channel, an order status) stay closed.
+Removing or renaming a code is a breaking change as always. See [ADR 0012](adr/0012-error-codes-are-an-open-set.md).
+
 What the contract documents: the 400, 401, 403, 404 and 429 responses of each operation that can return
 them. The 400 body is one shared schema (`Error400Response`, from `config/api_errors.py`), because
 the package's default, one schema per operation and field, grows a generated client by dozens of classes per

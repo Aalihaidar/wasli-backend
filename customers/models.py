@@ -7,6 +7,7 @@ from django.db import models
 from core.locales import LOCALE_CHOICES, Locale
 from core.models import BaseModel
 from core.tenancy import RestaurantOwnedModel
+from messaging.models import Channel
 
 
 class Customer(BaseModel):
@@ -125,3 +126,52 @@ class CustomerBlock(RestaurantOwnedModel):
 
     def __str__(self) -> str:
         return f"{self.restaurant} blocks {self.customer}"
+
+
+class VerificationCode(BaseModel):
+    """A six-digit code sent to an email address or a phone number.
+
+    Only a keyed hash of the code is stored (``customers.verification.hash_code``): the plain
+    code exists in the message that was sent and nowhere else. A code is valid until
+    ``expires_at``, for a limited number of wrong attempts, and until a newer code for the same
+    purpose replaces it (``invalidated_at``) or it is used (``consumed_at``).
+    """
+
+    class Purpose(models.TextChoices):
+        SIGNUP = "signup", "Verify the contact given at sign-up"
+        CONTACT = "contact", "Verify a contact added later"
+        PASSWORD_RESET = "password_reset", "Reset the password"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="verification_codes",
+    )
+    purpose = models.CharField(max_length=20, choices=Purpose)
+    channel = models.CharField(max_length=5, choices=Channel)
+    # The email address or phone number the code was sent to, normalised. For ``contact`` it is
+    # the new contact, which is saved on the user only after the code is verified.
+    identifier = models.CharField(max_length=254)
+    code_hash = models.CharField(max_length=64, editable=False)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    invalidated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes: ClassVar[list[models.Index]] = [
+            # Resend limits count the codes sent to one contact for one purpose.
+            models.Index(
+                fields=["identifier", "purpose", "created_at"],
+                name="verification_contact_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.purpose} code for {self.user_id}"
+
+    @property
+    def is_open(self) -> bool:
+        """Not used and not replaced (it may still have expired)."""
+        return self.consumed_at is None and self.invalidated_at is None

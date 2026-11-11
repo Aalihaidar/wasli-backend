@@ -256,6 +256,14 @@ REST_FRAMEWORK: dict[str, object] = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "60/min",
         "user": "240/min",
+        # The customer-account calls, per client address (per account once signed in).
+        "customer_signup": "10/hour",
+        "customer_verify": "20/min",
+        "customer_resend": "20/hour",
+        "customer_login": "10/min",
+        "customer_contact": "10/hour",
+        "customer_reset": "10/hour",
+        "customer_reset_confirm": "10/min",
     },
 }
 DRF_STANDARDIZED_ERRORS = {
@@ -266,6 +274,10 @@ DRF_STANDARDIZED_ERRORS = {
     # operation, which makes generated clients grow by dozens of classes per endpoint.
     "ERROR_SCHEMAS": {
         "400": "config.api_errors.Error400ResponseSerializer",
+        # The package's 403 and 429 documents only permission_denied and throttled; ours add the
+        # customer-account codes.
+        "403": "config.api_errors.Error403ResponseSerializer",
+        "429": "config.api_errors.Error429ResponseSerializer",
         # The package has no 409 schema of its own, so the project supplies it.
         "409": "config.api_errors.Error409ResponseSerializer",
     },
@@ -295,14 +307,17 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "ClientErrorEnum": f"{_ERROR_ENUMS}.ClientErrorEnum.choices",
         "ErrorCode401Enum": f"{_ERROR_ENUMS}.ErrorCode401Enum.choices",
-        "ErrorCode403Enum": f"{_ERROR_ENUMS}.ErrorCode403Enum.choices",
+        "ErrorCode403Enum": "config.api_errors.ErrorCode403Enum.choices",
         "ErrorCode404Enum": f"{_ERROR_ENUMS}.ErrorCode404Enum.choices",
         "ErrorCode409Enum": "config.api_errors.ErrorCode409Enum.choices",
-        "ErrorCode429Enum": f"{_ERROR_ENUMS}.ErrorCode429Enum.choices",
+        "ErrorCode429Enum": "config.api_errors.ErrorCode429Enum.choices",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
+    # The package's hook names the error-code enums; ours then makes them extensible, because the
+    # set of error codes grows with every feature (config/openapi_hooks.py).
     "POSTPROCESSING_HOOKS": [
-        "drf_standardized_errors.openapi_hooks.postprocess_schema_enums"
+        "drf_standardized_errors.openapi_hooks.postprocess_schema_enums",
+        "config.openapi_hooks.make_error_codes_extensible",
     ],
 }
 
