@@ -24,8 +24,8 @@ No new dependency. Everything is Django's own mechanism, in `config/admin.py`, `
 `templates/admin/` and `static/admin/css/wasli.css`:
 
 - **Branding:** "Wasli administration" instead of "Django administration", and a stylesheet that recolours Django's own colour
-  variables for the light and the dark theme. The brand colour is a single placeholder value (`--wasli-brand`) until the owner
-  chooses it.
+  variables for the light and the dark theme. The colours and the font (Rubik, two small files served from the site) follow
+  `docs/design.md`, the Ink & Mustard design the owner chose on 2026-11-11; `--wasli-brand` holds the primary colour.
 - **The environment in the header:** a small `LOCAL`, `STAGING` or `PRODUCTION` label next to the title, so staging is never
   taken for production.
 - **Sections in working order** instead of alphabetical: Restaurants, Menu, Orders, Customers, Conversations, Messaging,

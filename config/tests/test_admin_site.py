@@ -1,6 +1,7 @@
 """The Wasli admin: branding, the order of the sections, the environment badge and the counters
 on the first page (config/admin.py, config/dashboard.py, ADR 0013)."""
 
+import re
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -66,17 +67,44 @@ class TestBranding:
         assert "/static/admin/css/wasli.css" in index(admin_client)
         assert finders.find("admin/css/wasli.css")
 
-    def test_the_stylesheet_recolours_both_themes_and_uses_no_images(self) -> None:
+    def test_the_stylesheet_recolours_both_themes_and_loads_only_its_font(
+        self,
+    ) -> None:
         css = CSS.read_text()
 
         assert "--wasli-brand" in css
         assert "@media (prefers-color-scheme: dark)" in css
         assert 'html[data-theme="dark"]' in css and 'html[data-theme="light"]' in css
-        assert (
-            "url(" not in css
-        )  # no image or font to load, so nothing for a CSP to block
+        # The only files it loads are the two Rubik font files, from this site: no image and
+        # no outside address, so nothing for a strict Content Security Policy to block.
+        assert re.findall(r'url\("([^"]+)"\)', css) == [
+            "../fonts/rubik-latin.woff2",
+            "../fonts/rubik-arabic.woff2",
+        ]
+        assert "url(" not in css.replace('url("', "")
+        assert "http" not in css
         for token in ("--secondary", "--link-fg", "--breadcrumbs-bg", "--wasli-ok-bg"):
             assert token in css
+
+    def test_the_stylesheet_uses_the_design_colours(self) -> None:
+        """The values of docs/design.md: navy primary, mustard accent, off-white page."""
+        css = CSS.read_text()
+
+        for colour in (
+            "#1f2a44",
+            "#121a2e",
+            "#f2b705",
+            "#fafaf7",
+            "#5b6475",
+            "#2c4fa3",
+        ):
+            assert colour in css
+
+    @pytest.mark.parametrize(
+        "name", ["rubik-latin.woff2", "rubik-arabic.woff2", "Rubik-OFL.txt"]
+    )
+    def test_the_font_files_and_their_licence_are_shipped(self, name: str) -> None:
+        assert finders.find(f"admin/fonts/{name}")
 
     @pytest.mark.parametrize("environment", ["local", "staging", "production"])
     def test_the_environment_is_shown_next_to_the_title(
