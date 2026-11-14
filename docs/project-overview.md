@@ -81,7 +81,7 @@ flowchart LR
     ASSIST --> GEM
 ```
 
-- The two sites are separate Flutter apps in the sibling repository. They generate their API client from this repository's `openapi/schema.yaml`.
+- The two sites are separate Flutter apps, each in its own repository (`wasli-customer-flutter` and `wasli-restaurant-flutter`). They generate their API client from this repository's `openapi/schema.yaml`.
 - Staging runs on free plans: the API on Render, the database on Neon, the images on Cloudflare R2, the two sites on Cloudflare Pages. There are two environments: `develop` is staging (its own Render service and Neon project) and `main` is production (its own Render service and Neon project). Local development and tests also use the staging Neon project directly, with no local database. Both Neon projects, `wasli-staging` and `wasli-production`, are created, and the local `.env` points `DATABASE_URL` at `wasli-staging`. Neither Render service deploys on its own: after a group of pull requests is merged, the owner deploys by hand from the Render dashboard (staging from `develop`, production from `main`), so a merge never changes a running environment or its database by itself. Everything on staging stays on free plans. Production moves to paid always-on hosting without changing the data model or the API.
 - The sites poll every 3 seconds. Later versions replace polling with a realtime stream and add notifications and payments. Every outgoing email or SMS goes through the `messaging` app: on staging it is stored in an outbox shown in the Django admin (so the owner reads verification codes); in production it is sent by Resend (email) and an SMS provider.
 

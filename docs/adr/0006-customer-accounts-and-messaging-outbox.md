@@ -26,4 +26,4 @@ before a real email or SMS provider exists.
 - No customer can sign up on production until its messaging backends exist; production stays closed until the pilot.
 - The refusal happens when the backend is created, at the first send, and not when the process starts, so production can be
   deployed closed before a real backend exists. A start-up system check is a possible tightening.
-- Whether a customer who signed up with an email must also verify a phone number before the first order is still open.
+- Whether a customer who signed up with an email must also verify a phone number before the first order was open when this was written. Update, 2026-11-12: it must, at the pilot; the refusal code is agreed in an API request before the gate is built.

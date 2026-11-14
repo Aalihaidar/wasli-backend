@@ -1,7 +1,8 @@
 # Wasli design
 
 The visual rules for every Wasli screen: the customer site, the restaurant site, the later mobile
-and tablet apps (all built from one Flutter codebase, `wasli-flutter`) and the Django admin used by
+and tablet apps (all built in Flutter, in the two repositories `wasli-customer-flutter` and
+`wasli-restaurant-flutter`) and the Django admin used by
 the platform team. A screen that follows this file looks like Wasli. A rule that is missing here is
 decided once, in a pull request that changes this file.
 
@@ -232,8 +233,9 @@ the matching status colours and stays until dismissed.
 
 ## Flutter
 
-The theme lives in the Flutter repository (`wasli-flutter`), in one place (`lib/theme/`), generated
-from this file by hand: when this file changes, the theme changes in the same piece of work.
+The theme lives in each Flutter repository (`wasli-customer-flutter` and `wasli-restaurant-flutter`),
+in one place (`lib/theme/`), generated from this file by hand: when this file changes, both themes
+change in the same piece of work.
 
 ```dart
 // Light scheme, copied from the Colour table.

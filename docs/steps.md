@@ -139,8 +139,8 @@ The sections below take the project from the finished scaffold to the complete f
 - [ ] **Needs the owner:** a Gemini key for a project made for Wasli, and the WAV clips the frontend records in Chrome on Android and Safari on iPhone
 - [ ] Run the spike and report the model chosen, its free daily quota, the latency per call and which audio formats worked
 - [ ] **Needs the owner (frontend gate):** measure the first load of the Flutter web customer site as soon as its start screen and a chat shell are deployed on staging. Scan a QR code to the site with a real mid-range Android phone over mobile data, and with an iPhone in Safari, with an empty cache and with a warm one, and record the download size and the time until the screen is usable. Proposed target: usable within about 4 seconds on 4G with an empty cache (the owner confirms or changes it). If the result is clearly too slow, replace only the customer web site with a small web-only app and keep Flutter for the restaurant site and the later apps; the backend and the contract do not change either way
-- [ ] Publish release `v0.1.0` (raise the version, release pull request, publish the draft) and tell the frontend team which release to pin
-- [ ] **D1 done:** the real restaurant is entered through the admin on staging with its images on R2, the endpoints work there, a customer can sign up and verify with the code read in the admin outbox, `v0.1.0` is published and the spike is reported
+- [ ] Release `v0.1.0` (raise the version, release pull request): the owner keeps it as a draft until the whole backend is finished (decided 2026-11-14), so both frontend repositories (`wasli-customer-flutter`, `wasli-restaurant-flutter`) pin the contract by commit meanwhile; after a merge that changes `openapi/schema.yaml`, tell the frontend team the `develop` commit to pin
+- [ ] **D1 done:** the real restaurant is entered through the admin on staging with its images on R2, the endpoints work there, a customer can sign up and verify with the code read in the admin outbox, the `v0.1.0` contract is on `develop` (the release itself stays a draft) and the spike is reported
 
 ## 11. D2: the conversation engine
 
@@ -183,7 +183,8 @@ The sections below take the project from the finished scaffold to the complete f
 
 - [ ] Restaurant-admin API, each endpoint checking its permission code: menu and prices (items, options, photos, availability), members (add, edit, change role, deactivate and reactivate, reset password with a temporary password; no hard delete), restaurant settings, reports
 - [ ] Guardrails tested: an admin manages only their own restaurant, cannot grant more than their own role, cannot deactivate or demote the last admin; a deactivated member keeps their history and can be reactivated; a new member must change the temporary password
-- [ ] Decide with the owner whether a customer who signed up with an email must also verify a phone number before the first order
+- [x] Decide with the owner whether a customer who signed up with an email must also verify a phone number before the first order (decided 2026-11-12: it must, at the pilot)
+- [ ] Phone check before the first order: agree the refusal status and error code in an API request issue, then build the gate in the order service (it reuses `POST /customers/me/contact` and `POST /customers/me/contact/verify`) with tests
 - [ ] Audit log of price, menu and member changes (who, what, when)
 - [ ] Two-factor sign-in for the platform team
 - [ ] Per-device staff tokens, so signing out on one device does not sign out the others
