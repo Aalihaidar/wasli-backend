@@ -91,6 +91,14 @@ converts to the user's time zone for display only. Dates without a time are `YYY
 - Use HTTP status codes for the outcome (`201` created, `204` no content, `400` invalid, `401`/`403`
   not authenticated/allowed, `404` not found, `409` conflict) and keep them in the schema.
 - An empty list is `200` with an empty `results`, never `404`.
+- Never declare a nullable object reference. A value that may be missing is an optional
+  property, absent from the response when it has no value (for example `nearest` on
+  `GET /api/v1/restaurants/nearby`). Nullable scalars, such as `logo_url`, are allowed. The
+  generated clients read an optional reference as a nullable field, but not a nullable `allOf`
+  reference. Declare such a field without `help_text`, so the schema keeps a bare `$ref`, and put
+  its explanation in the operation description.
+- A value list that grows with features (error codes, `order_type`) is a string declared with
+  `x-extensible-enum`, never a closed `enum` (ADR 0012).
 
 ## Project rules
 

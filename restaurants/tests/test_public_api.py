@@ -41,7 +41,7 @@ class TestNearby:
 
         body = api.get(NEARBY, INSIDE).json()
 
-        assert body["nearest"] is None
+        assert "nearest" not in body
         [entry] = body["restaurants"]
         assert entry["slug"] == "cafe-a"
         assert entry["name_en"] == "Cafe A"
@@ -93,7 +93,7 @@ class TestNearby:
     ) -> None:
         body = api.get(NEARBY, INSIDE).json()
 
-        assert body == {"restaurants": [], "nearest": None}
+        assert body == {"restaurants": []}
 
     def test_the_range_is_the_lots_radius_not_the_restaurants(
         self, api: APIClient
@@ -112,15 +112,15 @@ class TestNearby:
     ) -> None:
         make_at("cafe-a", 25.2002, 55.2702, is_active=False)
 
-        assert api.get(NEARBY, INSIDE).json() == {"restaurants": [], "nearest": None}
+        assert api.get(NEARBY, INSIDE).json() == {"restaurants": []}
 
     def test_a_suspended_restaurant_is_never_listed_or_nearest(
         self, api: APIClient
     ) -> None:
         make_at("cafe-a", 25.2002, 55.2702, subscription_status="suspended")
 
-        assert api.get(NEARBY, INSIDE).json() == {"restaurants": [], "nearest": None}
-        assert api.get(NEARBY, FAR_AWAY).json() == {"restaurants": [], "nearest": None}
+        assert api.get(NEARBY, INSIDE).json() == {"restaurants": []}
+        assert api.get(NEARBY, FAR_AWAY).json() == {"restaurants": []}
 
     @pytest.mark.parametrize("status", ["trial", "active"])
     def test_trial_and_active_restaurants_are_listed(
@@ -166,7 +166,7 @@ class TestNearby:
         settings.REQUIRE_SCREEN_ONLINE = True
         make_at("offline", 25.2002, 55.2702)
 
-        assert api.get(NEARBY, FAR_AWAY).json() == {"restaurants": [], "nearest": None}
+        assert api.get(NEARBY, FAR_AWAY).json() == {"restaurants": []}
 
     def test_the_logo_is_an_absolute_url(self, api: APIClient) -> None:
         lot = make_lot()
@@ -235,7 +235,7 @@ class TestNearby:
     ) -> None:
         make_at("cafe-a", 25.2002, 55.2702)
 
-        assert set(api.get(NEARBY, INSIDE).json()) == {"restaurants", "nearest"}
+        assert set(api.get(NEARBY, INSIDE).json()) == {"restaurants"}
 
 
 class TestDetail:
