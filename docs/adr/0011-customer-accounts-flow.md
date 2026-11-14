@@ -62,6 +62,6 @@ minutes are refused for that contact. They are counted in the process cache, so 
   fails and saves nothing (the account is created and the message sent in one transaction).
 - Whoever can read a contact's messages can take over an unverified sign-up for it; that is the nature of proving a contact by
   a code, and the code expires.
-- Whether a customer who signed up with an email must also verify a phone number before the first order is still open.
+- Whether a customer who signed up with an email must also verify a phone number before the first order was open when this was written. Update, 2026-11-12: it must, at the pilot; the refusal code is agreed in an API request before the gate is built.
 - Per-worker counters allow a few more tries than the stated limits when several workers run; a shared cache would make
   them exact.
