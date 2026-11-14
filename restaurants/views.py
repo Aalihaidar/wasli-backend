@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.conf import settings
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
@@ -28,8 +30,9 @@ class NearbyRestaurantsView(PublicAPIView):
             "Visible restaurants (active, subscription not suspended) whose parking lot is in range of the point (within the "
             "lot's radius of its centre), nearest first. `distance_m` is the distance to the "
             "restaurant itself. When none is in range, `restaurants` is empty and `nearest` "
-            "holds the closest active restaurant. This list is polled and is not "
-            "paginated. No token is needed."
+            "holds the closest active restaurant, so the app can say how far it is. "
+            "`nearest` is absent when `restaurants` is not empty and when no restaurant is "
+            "visible at all. This list is polled and is not paginated. No token is needed."
         ),
         parameters=[NearbyQuerySerializer],
         responses={200: NearbyResponseSerializer},
@@ -42,10 +45,10 @@ class NearbyRestaurantsView(PublicAPIView):
             query.validated_data["lng"],
             require_screen_online=settings.REQUIRE_SCREEN_ONLINE,
         )
-        body = NearbyResponseSerializer(
-            {"restaurants": result.restaurants, "nearest": result.nearest},
-            context={"request": request},
-        )
+        data: dict[str, Any] = {"restaurants": result.restaurants}
+        if result.nearest is not None:
+            data["nearest"] = result.nearest
+        body = NearbyResponseSerializer(data, context={"request": request})
         return Response(body.data)
 
 

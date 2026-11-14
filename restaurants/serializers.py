@@ -55,13 +55,10 @@ class NearestRestaurantSerializer(NearbyRestaurantSerializer):
 
 class NearbyResponseSerializer(serializers.Serializer):  # type: ignore[misc]
     restaurants = NearbyRestaurantSerializer(many=True)
-    nearest = NearestRestaurantSerializer(
-        allow_null=True,
-        help_text=(
-            "Only when `restaurants` is empty: the closest active restaurant, so the "
-            "app can say how far it is. `null` otherwise."
-        ),
-    )
+    # Optional and never null: the key is absent when there is no nearest restaurant, and
+    # a nullable object reference is not allowed in the contract (docs/api-conventions.md).
+    # No help_text here: a description would wrap the reference in `allOf`.
+    nearest = NearestRestaurantSerializer(required=False)
 
 
 class MenuImageSerializer(serializers.ModelSerializer):  # type: ignore[misc]
