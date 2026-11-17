@@ -27,6 +27,7 @@ usernamehw
 
 # Tools, services, standards
 adminlte
+aquasec
 autonumber
 chainctl
 chainguard

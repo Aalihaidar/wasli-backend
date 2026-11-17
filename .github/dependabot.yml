@@ -7,7 +7,7 @@
 #   docker-compose  docker-compose.yml — postgres, redis, mailpit (tag + digest) AND
 #                   the dev image: once `bash scripts/pin-image.sh` pinned it to
 #                   python-X.Y.Z.R@sha256:…, new image builds arrive as PRs
-#   docker-compose  tools/api-tools/docker-compose.yml — oasdiff and Spectral
+#   docker-compose  tools/api-tools/docker-compose.yml — oasdiff, Spectral and Trivy
 #                   (own entry, so a failure there cannot block the dev stack)
 #   pre-commit      .pre-commit-config.yaml — hook revs
 #   pip             tools/ci/requirements.txt — the CLIs CI runs with uvx (pre-commit,
@@ -94,7 +94,7 @@ updates:
         update-types: ["minor", "patch"]
     open-pull-requests-limit: 5
 
-  # ── API-contract CI tools (oasdiff, Spectral) ────────────────────────
+  # ── CI tools run as containers (oasdiff, Spectral, Trivy) ─────────────
   # Pinned images in tools/api-tools/docker-compose.yml. Merge only stable
   # oasdiff tags (it also publishes release candidates).
   - package-ecosystem: "docker-compose"

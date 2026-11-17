@@ -1,9 +1,12 @@
 # ============================================================
 #  tools/api-tools/docker-compose.yml
 #
-#  The two tools of the API-contract CI jobs (ci.yml), as pinned containers:
+#  The tools of the CI jobs (ci.yml) that run as pinned containers:
 #    oasdiff   breaking-change check and changelog between two OpenAPI files
 #    spectral  style linter (ruleset: .spectral.yaml)
+#    trivy     vulnerability report of the production image (the Production image job).
+#              Not the aquasecurity/trivy-action: it runs aquasecurity/setup-trivy
+#              inside, a second action that the allowed-actions list would have to name.
 #
 #  Pulled, never built, and not part of the dev stack. They run as containers
 #  and not as GitHub Actions on purpose: GitHub checks every action a workflow
@@ -38,3 +41,10 @@ services:
       - ../..:/w:ro
     environment:
       NODE_NO_WARNINGS: "1"
+
+  # Scans the image `project:ci` that the Production image job built on the runner.
+  # It reads that image through the Docker socket of the (throwaway) runner.
+  trivy:
+    image: aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

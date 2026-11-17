@@ -479,14 +479,17 @@ jobs:
       # must not fail an unrelated change. The weekly run fails on a CRITICAL
       # finding that has a fix, which opens the tracking issue; the fix is usually
       # the pending Dependabot pull request for the python base image or uv.lock.
+      #
+      # Trivy runs as the pinned container of tools/api-tools/docker-compose.yml, not as
+      # the trivy-action: that action runs aquasecurity/setup-trivy inside, and GitHub
+      # stops the job when that second action is not in the allowed-actions list.
       - name: Vulnerability report (CRITICAL with a fix)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: project:ci
-          format: table
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: ${{ github.event_name == 'schedule' && '1' || '0' }}
+        env:
+          TRIVY_EXIT_CODE: ${{ github.event_name == 'schedule' && '1' || '0' }}
+        run: |
+          docker compose -f tools/api-tools/docker-compose.yml run --rm -T trivy \
+            image --scanners vuln --severity CRITICAL --ignore-unfixed \
+            --format table --exit-code "$TRIVY_EXIT_CODE" project:ci
 
   # The one check to require in branch protection. It always runs and fails if
   # any job above failed or was cancelled; jobs skipped by design (a Django job
