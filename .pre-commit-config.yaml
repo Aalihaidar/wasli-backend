@@ -68,7 +68,7 @@ repos:
       - id: gitleaks
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.3
+    rev: v0.17.4
     hooks:
       - id: ruff-check
         args: [--fix, --output-format=full]
@@ -84,7 +84,7 @@ repos:
 
   # Keeps uv.lock in sync whenever pyproject.toml changes.
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.13.6
+    rev: 0.13.7
     hooks:
       - id: uv-lock
 
@@ -121,7 +121,7 @@ repos:
       - id: actionlint
 
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.31.1
+    rev: v1.32.0
     hooks:
       - id: zizmor
         args: [--persona=regular, --offline, --no-progress]
