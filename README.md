@@ -16,13 +16,13 @@ the car through a chat with the restaurant.
 
 | Component | Version |
 | --- | --- |
-| Python | 3.14.9 (production image), 3.14.8 (dev container) |
+| Python | 3.15.2 (production image), 3.15.2 (dev container) |
 | Django | 6.0.9 |
 | Django REST framework | with drf-spectacular and drf-standardized-errors |
-| uv | 0.13.7 (production image), 0.13.5 (dev container) |
+| uv | 0.13.8 (production image), 0.13.8 (dev container) |
 | PostgreSQL | 18 |
 | Redis | 8 |
-| Dev container image | `alihaidar199527/django-devcontainer:python-3.14.8.6` |
+| Dev container image | `alihaidar199527/django-devcontainer:python-3.15.2.3` |
 
 Application libraries and their exact versions are pinned in `pyproject.toml` and
 `uv.lock`.
