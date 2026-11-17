@@ -7,9 +7,11 @@
 #   docker-compose  docker-compose.yml — postgres, redis, mailpit (tag + digest) AND
 #                   the dev image: once `bash scripts/pin-image.sh` pinned it to
 #                   python-X.Y.Z.R@sha256:…, new image builds arrive as PRs
-#   docker-compose  tools/api-tools/docker-compose.yml — oasdiff and Spectral
+#   docker-compose  tools/api-tools/docker-compose.yml — oasdiff, Spectral and Trivy
 #                   (own entry, so a failure there cannot block the dev stack)
 #   pre-commit      .pre-commit-config.yaml — hook revs
+#   pip             tools/ci/requirements.txt — the CLIs CI runs with uvx (pre-commit,
+#                   pip-audit)
 #   uv              pyproject.toml + uv.lock — enabled by scripts/init-django.sh
 #                   (block at the end; commented here so the template itself,
 #                   which has no pyproject.toml, doesn't fail every week)
@@ -49,7 +51,7 @@ updates:
     labels: ["dependencies", "docker"]
     # The production Python follows Django: the newest minor Django officially
     # supports (see scripts/set-python.sh), not the newest Python released. Patch
-    # updates (3.14.8 -> 3.14.9) arrive here; a new minor, and any release
+    # updates (3.15.1 -> 3.15.2) arrive here; a new minor, and any release
     # candidate of one, is ignored and moved to on purpose with
     # `bash scripts/set-python.sh`.
     ignore:
@@ -92,7 +94,7 @@ updates:
         update-types: ["minor", "patch"]
     open-pull-requests-limit: 5
 
-  # ── API-contract CI tools (oasdiff, Spectral) ────────────────────────
+  # ── CI tools run as containers (oasdiff, Spectral, Trivy) ─────────────
   # Pinned images in tools/api-tools/docker-compose.yml. Merge only stable
   # oasdiff tags (it also publishes release candidates).
   - package-ecosystem: "docker-compose"
@@ -121,6 +123,22 @@ updates:
     labels: ["dependencies", "pre-commit"]
     groups:
       pre-commit-hooks-all:
+        patterns: ["*"]
+    open-pull-requests-limit: 3
+
+  # ── CLIs the CI workflows run with uvx (pre-commit, pip-audit) ───────
+  # Pinned in tools/ci/requirements.txt and passed to uvx as a constraint, so a new
+  # release reaches CI through a reviewed pull request, never unannounced.
+  - package-ecosystem: "pip"
+    directory: "/tools/ci"
+    schedule: { interval: "weekly", day: "monday", time: "09:00", timezone: "UTC" }
+    cooldown: { default-days: 7 }
+    target-branch: "develop"
+    assignees: ["Aalihaidar"]
+    commit-message: { prefix: "ci", include: "scope" }
+    labels: ["dependencies", "python"]
+    groups:
+      ci-tools-all:
         patterns: ["*"]
     open-pull-requests-limit: 3
 
