@@ -5,11 +5,13 @@ the car through a chat with the restaurant.
 
 [![CI](https://github.com/Aalihaidar/wasli-backend/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/Aalihaidar/wasli-backend/actions/workflows/ci.yml)
 
-> **Status (2026-11-09):** in development, milestone D1 of the first version. Staging is
-> live at <https://wasli-staging.onrender.com>. The data models, admin and tests of the
-> seven Wasli apps are built; the order service, the conversation engine, messaging,
-> customer sign-up, image storage, the assistant adapters and the API endpoints come
-> next. The checklist is [`docs/steps.md`](docs/steps.md); the design is in
+> **Status (2026-11-18):** in development, milestone D1 of the first version, closing. Staging is
+> live at <https://wasli-staging.onrender.com>. Built: the data models, admin and tests of the
+> eight Wasli apps, the three public read endpoints, the ten customer-account endpoints
+> (sign-up with a verification code, sign-in, password reset), image storage on Cloudflare R2,
+> the assistant adapters, the API hardening baseline and the committed API contract. Next: the
+> order service, the conversation engine (D2) and the staff endpoints (D3). The checklist is
+> [`docs/steps.md`](docs/steps.md); the design is in
 > [`docs/project-overview.md`](docs/project-overview.md).
 
 ## Stack
@@ -17,9 +19,9 @@ the car through a chat with the restaurant.
 | Component | Version |
 | --- | --- |
 | Python | 3.15.2 (production image), 3.15.2 (dev container) |
-| Django | 6.0.9 |
+| Django | 6.0.10 |
 | Django REST framework | with drf-spectacular and drf-standardized-errors |
-| uv | 0.13.8 (production image), 0.13.8 (dev container) |
+| uv | 0.13.9 (production image), 0.13.8 (dev container) |
 | PostgreSQL | 18 |
 | Redis | 8 |
 | Dev container image | `alihaidar199527/django-devcontainer:python-3.15.2.3` |
@@ -32,15 +34,35 @@ Application libraries and their exact versions are pinned in `pyproject.toml` an
 | App | What it holds |
 | --- | --- |
 | `users` | The one account table: sign-in with a username, an email or a phone number |
-| `core` | Shared base model, money and distance helpers, permission codes, restaurant scoping |
-| `restaurants` | Parking lots, restaurants, menu images and staff memberships (roles `admin` and `cashier`) |
+| `core` | Shared base model, money and distance helpers, permission codes, restaurant scoping, the public `config` endpoint |
+| `restaurants` | Parking lots, restaurants, menu images and staff memberships (roles `admin` and `cashier`), the public restaurant endpoints |
 | `menu` | Categories, items, option groups and options |
-| `customers` | Customers, their sessions and cars, restaurant blocks, the customer token authentication |
+| `customers` | Customers, their sessions and cars, restaurant blocks, the customer token authentication, sign-up with a verification code, sign-in and password reset |
+| `messaging` | The outbox of emails and SMS (shown in the admin on local and staging, refused in production) and the delivery interface |
 | `chat` | Conversations and messages |
 | `orders` | Orders, order lines and the status history |
-| `assistant` | The log of calls to the assistant provider |
+| `assistant` | The adapters to the understanding provider (a fake one for tests, Gemini), the prompts and the log of calls |
 
-The conversation engine, the `messaging` app and the API endpoints are not built yet.
+The order service, the conversation engine and the staff endpoints are not built yet.
+
+## The API
+
+The contract is [`openapi/schema.yaml`](openapi/schema.yaml), generated with
+`bash scripts/schema.sh generate` and never edited by hand. Built so far, all under `/api/v1/`:
+
+- `GET /config`, `GET /restaurants/nearby` and `GET /restaurants/{slug}`: public, no token.
+- Ten endpoints under `/customers/` (`signup`, `verify`, `resend-code`, `login`, `logout`, `me`,
+  `me/contact`, `me/contact/verify`, `password-reset`, `password-reset/confirm`).
+
+On local and staging, staff signed in through the admin can open Swagger UI at `/api/docs/`;
+production serves nothing there. The two Flutter repositories pin the contract by commit until
+the first release is published. After a change to `openapi/schema.yaml`, tell them the commit
+to pin. The conventions are in [`docs/api-conventions.md`](docs/api-conventions.md) and the
+decisions in [`docs/adr/`](docs/adr/README.md).
+
+Management commands: `check_media [--fetch]` (checks the image storage), `purge_outbox`
+(deletes old outbox messages) and `assistant_spike` (tries the assistant on sample input; never
+in production).
 
 ## Environments
 
@@ -97,7 +119,9 @@ enabled while the repository is private on the free plan, so the local hooks are
 ## Template
 
 Created from [`alihaidar0/django-template`](https://github.com/alihaidar0/django-template)
-release [`v2026.11.01`](https://github.com/alihaidar0/django-template/releases/tag/v2026.11.01).
+release [`v2026.11.01`](https://github.com/alihaidar0/django-template/releases/tag/v2026.11.01)
+and synced with release
+[`v2026.11.17`](https://github.com/alihaidar0/django-template/releases/tag/v2026.11.17).
 
 ## License
 
