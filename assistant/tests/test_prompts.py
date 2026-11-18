@@ -2,6 +2,7 @@
 as data."""
 
 import json
+import re
 from typing import Any
 
 import pytest
@@ -75,8 +76,11 @@ class TestMenuBuilder:
         request = prompts.parse_order_request(menu, [], None, "two karak", "en")
 
         assert "price" not in request.context.lower()
+        # Match whole numbers only: item ids are random UUIDs and can contain "777" by chance.
         for amount in ("777", "321", "888"):
-            assert amount not in request.context
+            assert not re.search(
+                rf"(?<![0-9A-Za-z]){amount}(?![0-9A-Za-z])", request.context
+            )
         assert "price" not in json.dumps(prompts.menu_json(menu)).lower()
 
 
