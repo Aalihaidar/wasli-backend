@@ -34,7 +34,7 @@ x-dev-image: &dev-image
   # on), after which the toolchain only changes through a reviewed Dependabot
   # pull request. Keep this a literal line (no ${VAR}) so Dependabot's
   # docker-compose ecosystem can read it.
-  image: alihaidar199527/django-devcontainer:python-3.14.8.6@sha256:091462aa681833e3921d2fa0573d2d47a20b7bdb11d370629a24d4ae27be0ae1
+  image: alihaidar199527/django-devcontainer:python-3.15.2.3@sha256:82410769ebca8b5f83be6d7c0c7e9044dbe2a23ba1362f14cfa0d5414cc30670
   # tini as PID 1: forwards signals and reaps zombies, so `docker compose stop`
   # is instant instead of waiting 10 s for `sleep infinity`.
   init: true
@@ -57,6 +57,16 @@ x-dev-image: &dev-image
     # no key is needed; set AI_PROVIDER=gemini plus the key and model in .env to use the real one.
     ENVIRONMENT: ${ENVIRONMENT:-local}
     LOCATION_CHECK: ${LOCATION_CHECK:-warn}
+    MESSAGING_BACKEND: ${MESSAGING_BACKEND:-outbox}
+    OUTBOX_RETENTION_HOURS: ${OUTBOX_RETENTION_HOURS:-24}
+    # Uploaded images: the local disk by default; set MEDIA_STORAGE=r2 and the R2_* values in .env
+    # to use the staging bucket from the dev container.
+    MEDIA_STORAGE: ${MEDIA_STORAGE:-filesystem}
+    R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+    R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+    R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+    R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
+    R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
     REQUIRE_SCREEN_ONLINE: ${REQUIRE_SCREEN_ONLINE:-false}
     AI_PROVIDER: ${AI_PROVIDER:-fake}
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -163,7 +173,7 @@ services:
       retries: 10
 
   mailpit:
-    image: axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
+    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
     restart: unless-stopped
     ports:
       - "127.0.0.1:8025:8025"   # web UI

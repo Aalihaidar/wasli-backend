@@ -1,0 +1,395 @@
+/* The look of the Wasli admin, following docs/design.md (Ink & Mustard): Django's own colour
+   variables, recoloured with the design tokens, Rubik as the font, plus a few small components
+   (environment badge, counters, thumbnails, status labels). The only files it loads are the two
+   Rubik font files below, served from this site, and no inline styles are used anywhere, so it
+   works under a strict Content Security Policy.
+
+   The values are copied from the colour table of docs/design.md: change them there first. */
+
+@font-face {
+    font-family: "Rubik";
+    font-style: normal;
+    font-weight: 300 900;
+    font-display: swap;
+    src: url("../fonts/rubik-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Rubik";
+    font-style: normal;
+    font-weight: 300 900;
+    font-display: swap;
+    src: url("../fonts/rubik-arabic.woff2") format("woff2");
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC;
+}
+
+:root {
+    /* Tokens, light theme */
+    --wasli-brand: #1f2a44; /* primary */
+    --wasli-brand-dark: #121a2e; /* primary_dark */
+
+    --wasli-ok-bg: #dff3e4;
+    --wasli-ok-fg: #14532d;
+    --wasli-warn-bg: #fdf0d0;
+    --wasli-warn-fg: #7a4b00;
+    --wasli-bad-bg: #fde2e0;
+    --wasli-bad-fg: #8a1c14;
+    --wasli-info-bg: #dbeafe;
+    --wasli-info-fg: #1e3a8a;
+
+    /* Django's variables */
+    --primary: var(--wasli-brand);
+    --secondary: var(--wasli-brand);
+    --accent: #f2b705;
+    --primary-fg: #ffffff;
+
+    --body-fg: #121a2e;
+    --body-bg: #fafaf7;
+    --body-quiet-color: #5b6475;
+    --body-medium-color: #121a2e;
+    --body-loud-color: #121a2e;
+
+    --header-color: #ffffff;
+
+    --breadcrumbs-fg: #c4cad8;
+    --breadcrumbs-link-fg: #fafaf7;
+    --breadcrumbs-bg: var(--wasli-brand-dark);
+
+    --link-fg: #2c4fa3;
+    --link-hover-color: #121a2e;
+    --link-selected-fg: var(--wasli-brand);
+
+    --hairline-color: #e3e4e0;
+    --border-color: #7e869a;
+
+    --error-fg: #b3261e;
+
+    --message-info-bg: var(--wasli-info-bg);
+    --message-success-bg: var(--wasli-ok-bg);
+    --message-warning-bg: var(--wasli-warn-bg);
+    --message-error-bg: var(--wasli-bad-bg);
+
+    --darkened-bg: #ffffff;
+    --selected-bg: #e3e4e0;
+    --selected-row: var(--wasli-warn-bg);
+
+    --button-fg: #ffffff;
+    --button-bg: var(--wasli-brand);
+    --button-hover-bg: var(--wasli-brand-dark);
+    --default-button-bg: var(--wasli-brand-dark);
+    --default-button-hover-bg: var(--wasli-brand);
+    --close-button-bg: #5b6475;
+    --close-button-hover-bg: #121a2e;
+    --delete-button-bg: #b3261e;
+    --delete-button-hover-bg: #8a1c14;
+
+    --font-family-primary: "Rubik", "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Tokens, dark theme: the visitor's system setting, then a choice made by hand. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --wasli-ok-bg: #123d24;
+        --wasli-ok-fg: #b7efc8;
+        --wasli-warn-bg: #4a3300;
+        --wasli-warn-fg: #ffdf9b;
+        --wasli-bad-bg: #4d1410;
+        --wasli-bad-fg: #ffc6c0;
+        --wasli-info-bg: #14305f;
+        --wasli-info-fg: #bcd4ff;
+
+        --primary: #2a3550;
+        --secondary: #182036;
+        --primary-fg: #f2f1ec;
+
+        --body-fg: #f2f1ec;
+        --body-bg: #0f1626;
+        --body-quiet-color: #a9b0c0;
+        --body-medium-color: #f2f1ec;
+        --body-loud-color: #ffffff;
+
+        --header-color: #f2f1ec;
+
+        --breadcrumbs-fg: #a9b0c0;
+        --breadcrumbs-link-fg: #f2f1ec;
+        --breadcrumbs-bg: var(--primary);
+
+        --link-fg: #8fb0ff;
+        --link-hover-color: #f2f1ec;
+        --link-selected-fg: #f2b705;
+
+        --hairline-color: #2a3550;
+        --border-color: #7b849c;
+
+        --error-fg: #ffb4ab;
+
+        --darkened-bg: #182036;
+        --selected-bg: #2a3550;
+
+        --button-fg: #121a2e;
+        --button-bg: #f2b705;
+        --button-hover-bg: #c99700;
+        --default-button-bg: #f2b705;
+        --default-button-hover-bg: #c99700;
+        --close-button-bg: #2a3550;
+        --close-button-hover-bg: #182036;
+        --delete-button-bg: #ffb4ab;
+        --delete-button-hover-bg: #ffc6c0;
+
+        --object-tools-fg: #f2f1ec;
+    }
+}
+
+html[data-theme="dark"] {
+    --wasli-ok-bg: #123d24;
+    --wasli-ok-fg: #b7efc8;
+    --wasli-warn-bg: #4a3300;
+    --wasli-warn-fg: #ffdf9b;
+    --wasli-bad-bg: #4d1410;
+    --wasli-bad-fg: #ffc6c0;
+    --wasli-info-bg: #14305f;
+    --wasli-info-fg: #bcd4ff;
+
+    --primary: #2a3550;
+    --secondary: #182036;
+    --primary-fg: #f2f1ec;
+
+    --body-fg: #f2f1ec;
+    --body-bg: #0f1626;
+    --body-quiet-color: #a9b0c0;
+    --body-medium-color: #f2f1ec;
+    --body-loud-color: #ffffff;
+
+    --header-color: #f2f1ec;
+
+    --breadcrumbs-fg: #a9b0c0;
+    --breadcrumbs-link-fg: #f2f1ec;
+    --breadcrumbs-bg: var(--primary);
+
+    --link-fg: #8fb0ff;
+    --link-hover-color: #f2f1ec;
+    --link-selected-fg: #f2b705;
+
+    --hairline-color: #2a3550;
+    --border-color: #7b849c;
+
+    --error-fg: #ffb4ab;
+
+    --darkened-bg: #182036;
+    --selected-bg: #2a3550;
+    --message-info-bg: var(--wasli-info-bg);
+    --message-success-bg: var(--wasli-ok-bg);
+    --message-warning-bg: var(--wasli-warn-bg);
+    --message-error-bg: var(--wasli-bad-bg);
+    --selected-row: var(--wasli-warn-bg);
+
+    --button-fg: #121a2e;
+    --button-bg: #f2b705;
+    --button-hover-bg: #c99700;
+    --default-button-bg: #f2b705;
+    --default-button-hover-bg: #c99700;
+    --close-button-bg: #2a3550;
+    --close-button-hover-bg: #182036;
+    --delete-button-bg: #ffb4ab;
+    --delete-button-hover-bg: #ffc6c0;
+
+    --object-tools-fg: #f2f1ec;
+}
+
+/* A theme chosen by hand wins over the system setting. */
+html[data-theme="light"] {
+    --wasli-ok-bg: #dff3e4;
+    --wasli-ok-fg: #14532d;
+    --wasli-warn-bg: #fdf0d0;
+    --wasli-warn-fg: #7a4b00;
+    --wasli-bad-bg: #fde2e0;
+    --wasli-bad-fg: #8a1c14;
+    --wasli-info-bg: #dbeafe;
+    --wasli-info-fg: #1e3a8a;
+
+    --primary: var(--wasli-brand);
+    --secondary: var(--wasli-brand);
+    --primary-fg: #ffffff;
+
+    --body-fg: #121a2e;
+    --body-bg: #fafaf7;
+    --body-quiet-color: #5b6475;
+    --body-medium-color: #121a2e;
+    --body-loud-color: #121a2e;
+
+    --header-color: #ffffff;
+
+    --breadcrumbs-fg: #c4cad8;
+    --breadcrumbs-link-fg: #fafaf7;
+    --breadcrumbs-bg: var(--wasli-brand-dark);
+
+    --link-fg: #2c4fa3;
+    --link-hover-color: #121a2e;
+    --link-selected-fg: var(--wasli-brand);
+
+    --hairline-color: #e3e4e0;
+    --border-color: #7e869a;
+
+    --error-fg: #b3261e;
+
+    --darkened-bg: #ffffff;
+    --selected-bg: #e3e4e0;
+    --message-info-bg: var(--wasli-info-bg);
+    --message-success-bg: var(--wasli-ok-bg);
+    --message-warning-bg: var(--wasli-warn-bg);
+    --message-error-bg: var(--wasli-bad-bg);
+    --selected-row: var(--wasli-warn-bg);
+
+    --button-fg: #ffffff;
+    --button-bg: var(--wasli-brand);
+    --button-hover-bg: var(--wasli-brand-dark);
+    --default-button-bg: var(--wasli-brand-dark);
+    --default-button-hover-bg: var(--wasli-brand);
+    --close-button-bg: #5b6475;
+    --close-button-hover-bg: #121a2e;
+    --delete-button-bg: #b3261e;
+    --delete-button-hover-bg: #8a1c14;
+
+    --object-tools-fg: #ffffff;
+}
+
+/* Type: Rubik for every page title, regular weight elsewhere */
+h1 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+/* Header */
+#header {
+    box-shadow: 0 1px 0 rgba(18, 26, 46, 0.18);
+}
+
+#site-name a {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.wasli-env {
+    display: inline-block;
+    margin-inline-start: 0.75rem;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.wasli-env--local {
+    background: #2e7d32;
+}
+
+.wasli-env--staging {
+    background: #b26a00;
+}
+
+.wasli-env--production {
+    background: #b3261e;
+}
+
+/* The counters on the first page */
+.wasli-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin: 0 0 24px;
+}
+
+.wasli-card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 16px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 12px;
+    background: var(--darkened-bg);
+    color: var(--body-fg);
+    text-decoration: none;
+}
+
+.wasli-card:hover {
+    border-color: var(--link-fg);
+}
+
+.wasli-card__label {
+    color: var(--body-quiet-color);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.wasli-card__value {
+    color: var(--body-loud-color);
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.wasli-card__hint {
+    color: var(--body-quiet-color);
+    font-size: 0.8rem;
+}
+
+/* Image thumbnails in lists and forms */
+.wasli-thumb {
+    display: block;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--darkened-bg);
+    object-fit: cover;
+}
+
+.wasli-thumb--large {
+    width: auto;
+    max-width: 260px;
+    height: 110px;
+}
+
+.wasli-empty {
+    color: var(--body-quiet-color);
+}
+
+/* Status labels */
+.wasli-badge {
+    display: inline-block;
+    padding: 0.1rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.wasli-badge--ok {
+    background: var(--wasli-ok-bg);
+    color: var(--wasli-ok-fg);
+}
+
+.wasli-badge--warn {
+    background: var(--wasli-warn-bg);
+    color: var(--wasli-warn-fg);
+}
+
+.wasli-badge--bad {
+    background: var(--wasli-bad-bg);
+    color: var(--wasli-bad-fg);
+}
+
+.wasli-badge--info {
+    background: var(--wasli-info-bg);
+    color: var(--wasli-info-fg);
+}
+
+.wasli-badge--muted {
+    background: var(--selected-bg);
+    color: var(--body-quiet-color);
+}

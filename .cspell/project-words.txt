@@ -26,17 +26,22 @@ timonwong
 usernamehw
 
 # Tools, services, standards
+adminlte
+aquasec
 autonumber
 chainctl
 chainguard
 errorlens
 ghaction
 gitleaks
+grappelli
 healthz
+jazzmin
 Mailpit
 oasdiff
 pgcli
 pgsql
+pubspec
 pytype
 pyupgrade
 SARIF
@@ -72,6 +77,7 @@ allkeys
 gsub
 isready
 keygen
+logformat
 ltrimstr
 maxmemory
 noinput

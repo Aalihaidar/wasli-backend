@@ -1,0 +1,16 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+{% if wasli_cards %}
+<div class="wasli-cards">
+  {% for card in wasli_cards %}
+  <a class="wasli-card" href="{{ card.url }}">
+    <span class="wasli-card__label">{{ card.label }}</span>
+    <span class="wasli-card__value">{{ card.value }}</span>
+    <span class="wasli-card__hint">{{ card.hint }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

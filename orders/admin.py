@@ -3,10 +3,12 @@ from typing import Any
 from django.conf import settings
 from django.contrib import admin
 from django.http import HttpRequest
+from django.utils.safestring import SafeString
 
+from core.admin_display import BadgeKind, badge
 from core.money import format_minor
 
-from .models import Order, OrderEvent, OrderItem
+from .models import Order, OrderEvent, OrderItem, OrderStatus
 
 
 class ReadOnlyInline(admin.TabularInline):  # type: ignore[type-arg]
@@ -60,11 +62,12 @@ class OrderAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         "number",
         "restaurant",
         "customer",
-        "status",
+        "status_label",
         "total",
         "distance_m",
         "placed_at",
     )
+    list_display_links = ("number",)
     list_filter = ("status", "restaurant")
     search_fields = (
         "vehicle_plate",
@@ -115,6 +118,20 @@ class OrderAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     @admin.display(description="Total (AED)", ordering="total_minor")
     def total(self, obj: Order) -> str:
         return format_minor(obj.total_minor)
+
+    @admin.display(description="Status", ordering="status")
+    def status_label(self, obj: Order) -> SafeString:
+        kinds: dict[str, BadgeKind] = {
+            OrderStatus.PLACED: "warn",  # waiting for the restaurant
+            OrderStatus.ACCEPTED: "info",
+            OrderStatus.READY: "ok",
+            OrderStatus.DELIVERED: "ok",
+            OrderStatus.REJECTED: "bad",
+            OrderStatus.NOT_FOUND: "bad",
+            OrderStatus.NO_SHOW: "bad",
+            OrderStatus.CANCELLED: "muted",
+        }
+        return badge(obj.get_status_display(), kinds.get(obj.status, "muted"))
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False

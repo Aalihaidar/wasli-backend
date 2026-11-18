@@ -205,3 +205,50 @@ def test_the_list_can_be_searched_and_filtered(admin_client: Client) -> None:
     assert [o.restaurant.slug for o in found] == ["cafe-b"]
     placed = admin_client.get(url, {"status": "placed"}).context["cl"].result_list
     assert len(placed) == 2
+
+
+class TestStatusLabels:
+    @pytest.mark.parametrize(
+        ("status", "kind", "text"),
+        [
+            ("placed", "warn", "Placed"),
+            ("accepted", "info", "Accepted"),
+            ("ready", "ok", "Ready"),
+            ("delivered", "ok", "Delivered"),
+            ("rejected", "bad", "Rejected"),
+            ("not_found", "bad", "Car not found"),
+            ("no_show", "bad", "No-show"),
+            ("cancelled", "muted", "Cancelled"),
+        ],
+    )
+    def test_each_status_has_its_colour(
+        self, admin_client: Client, status: str, kind: str, text: str
+    ) -> None:
+        if status == "rejected":
+            make_order(status=status, rejection_reason_code="too_busy")
+        else:
+            make_order(status=status)
+
+        page = admin_client.get(
+            reverse("admin:orders_order_changelist")
+        ).content.decode()
+
+        assert f'<span class="wasli-badge wasli-badge--{kind}">{text}</span>' in page
+
+    def test_the_status_filter_still_works(self, admin_client: Client) -> None:
+        make_order(status="accepted")
+
+        page = admin_client.get(
+            reverse("admin:orders_order_changelist") + "?status__exact=placed"
+        ).content.decode()
+
+        assert "wasli-badge--info" not in page
+
+    def test_the_order_number_is_the_link(self, admin_client: Client) -> None:
+        order = make_order()
+
+        page = admin_client.get(
+            reverse("admin:orders_order_changelist")
+        ).content.decode()
+
+        assert reverse("admin:orders_order_change", args=[order.pk]) in page

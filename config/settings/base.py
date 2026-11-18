@@ -14,8 +14,10 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from corsheaders.defaults import default_headers
 
 from config.env import env_bool, env_choice, env_int
+from config.storage import media_storage
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -36,7 +38,8 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # Django's admin with Wasli's site as the default (config/apps.py, config/admin.py).
+    "config.apps.WasliAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -59,7 +62,8 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        # Project-level templates (the admin's branding and first page, templates/admin/).
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -120,6 +124,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+# Project-level static files (the admin stylesheet, static/admin/css/wasli.css).
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 
 # ── Environment-driven settings (scripts/init-django.sh) ─────────────────
@@ -145,6 +151,10 @@ CORS_ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
+# The browser apps read the request id of a failed call and send their own.
+CORS_EXPOSE_HEADERS = ["Retry-After", "X-Request-ID"]
+CORS_ALLOW_HEADERS = [*default_headers, "x-request-id"]
+
 # ── Wasli settings ───────────────────────────────────────────────────────
 # Read from the environment (docker-compose.yml / .env locally, the Render service in
 # production); a bad value stops start-up (config/env.py). Differences between environments
@@ -154,6 +164,15 @@ ENVIRONMENT = env_choice("ENVIRONMENT", "local", {"local", "staging", "productio
 # How an order's location is checked against the restaurant: "off", "warn" (record it,
 # never block) or "enforce" (refuse a clearly-outside order).
 LOCATION_CHECK = env_choice("LOCATION_CHECK", "warn", {"off", "warn", "enforce"})
+# How outgoing email and SMS leave the system (messaging/backends.py). "outbox" stores them
+# in the database for the owner to read in the admin; it refuses to run in production.
+# "disabled" sends nothing and refuses every send: production uses it until a real backend
+# exists, so no customer can sign up there. The outbox is refused in production by a system
+# check (messaging/checks.py).
+MESSAGING_BACKEND = env_choice("MESSAGING_BACKEND", "outbox", {"outbox", "disabled"})
+# Outbox messages hold plain verification codes, so they are deleted after this many hours
+# (each send deletes the older ones; python manage.py purge_outbox does it on demand).
+OUTBOX_RETENTION_HOURS = env_int("OUTBOX_RETENTION_HOURS", 24, minimum=1)
 # True: list a restaurant only while its site polled in the last 60 seconds.
 REQUIRE_SCREEN_ONLINE = env_bool("REQUIRE_SCREEN_ONLINE", default=False)
 # The assistant layer only understands input (orders, car details, voice); it never writes
@@ -182,6 +201,7 @@ INSTALLED_APPS += [
     "rest_framework",
     "rest_framework.authtoken",  # staff API tokens (Authorization: Token <token>)
     "drf_spectacular",
+    "drf_spectacular_sidecar",  # Swagger UI files served from the app, no CDN
     "drf_standardized_errors",
     "django_celery_beat",
     "users",
@@ -193,6 +213,7 @@ INSTALLED_APPS += [
     "chat",
     "orders",
     "assistant",
+    "messaging",
 ]
 
 # A custom user model, in place from the first migration (users/models.py).
@@ -206,9 +227,9 @@ AUTHENTICATION_BACKENDS = ["users.backends.IdentifierBackend"]
 
 # ── API contract (drf-spectacular) ───────────────────────────────────────
 # openapi/schema.yaml is generated from the code (bash scripts/schema.sh generate)
-# and committed; it is the contract with every API client. The schema is NOT
-# served by the app: no SpectacularAPIView is wired into the URLconf, so
-# nothing is exposed in production unless the project adds it on purpose.
+# and committed; it is the contract with every API client. The running app serves the schema
+# and Swagger UI (config/api_docs.py) only on local and staging and only to staff accounts;
+# production serves neither, so nothing is exposed there.
 #
 # One error body for every API error (drf-standardized-errors): {"type", "errors": [{"code",
 # "detail", "attr"}]}. Its AutoSchema documents the error responses of each operation, so
@@ -239,6 +260,14 @@ REST_FRAMEWORK: dict[str, object] = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "60/min",
         "user": "240/min",
+        # The customer-account calls, per client address (per account once signed in).
+        "customer_signup": "10/hour",
+        "customer_verify": "20/min",
+        "customer_resend": "20/hour",
+        "customer_login": "10/min",
+        "customer_contact": "10/hour",
+        "customer_reset": "10/hour",
+        "customer_reset_confirm": "10/min",
     },
 }
 DRF_STANDARDIZED_ERRORS = {
@@ -249,6 +278,10 @@ DRF_STANDARDIZED_ERRORS = {
     # operation, which makes generated clients grow by dozens of classes per endpoint.
     "ERROR_SCHEMAS": {
         "400": "config.api_errors.Error400ResponseSerializer",
+        # The package's 403 and 429 documents only permission_denied and throttled; ours add the
+        # customer-account codes.
+        "403": "config.api_errors.Error403ResponseSerializer",
+        "429": "config.api_errors.Error429ResponseSerializer",
         # The package has no 409 schema of its own, so the project supplies it.
         "409": "config.api_errors.Error409ResponseSerializer",
     },
@@ -259,6 +292,16 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "The HTTP API of Wasli: order from the car through a chat with the restaurant.",
     "VERSION": "0.1.0",  # the API contract version, not the app's release
     "SERVE_INCLUDE_SCHEMA": False,
+    # Swagger UI ships inside the image (drf-spectacular-sidecar): no CDN, so the page also
+    # works under a strict CSP. The routes are in config/api_docs.py (staff only, local and
+    # staging only).
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "displayRequestDuration": True,
+        "persistAuthorization": True,
+    },
     # Separate request and response components: what client generators expect.
     "COMPONENT_SPLIT_REQUEST": True,
     # Keep /api/v1/ out of operation ids and tags (path versioning).
@@ -268,14 +311,17 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "ClientErrorEnum": f"{_ERROR_ENUMS}.ClientErrorEnum.choices",
         "ErrorCode401Enum": f"{_ERROR_ENUMS}.ErrorCode401Enum.choices",
-        "ErrorCode403Enum": f"{_ERROR_ENUMS}.ErrorCode403Enum.choices",
+        "ErrorCode403Enum": "config.api_errors.ErrorCode403Enum.choices",
         "ErrorCode404Enum": f"{_ERROR_ENUMS}.ErrorCode404Enum.choices",
         "ErrorCode409Enum": "config.api_errors.ErrorCode409Enum.choices",
-        "ErrorCode429Enum": f"{_ERROR_ENUMS}.ErrorCode429Enum.choices",
+        "ErrorCode429Enum": "config.api_errors.ErrorCode429Enum.choices",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
+    # The package's hook names the error-code enums; ours then makes them extensible, because the
+    # set of error codes grows with every feature (config/openapi_hooks.py).
     "POSTPROCESSING_HOOKS": [
-        "drf_standardized_errors.openapi_hooks.postprocess_schema_enums"
+        "drf_standardized_errors.openapi_hooks.postprocess_schema_enums",
+        "config.openapi_hooks.make_error_codes_extensible",
     ],
 }
 
@@ -296,11 +342,35 @@ MIDDLEWARE.insert(
 )
 # /healthz answers before host validation and HTTPS redirects (config/health.py).
 MIDDLEWARE.insert(0, "config.health.HealthCheckMiddleware")
+# The API baseline (config/middleware.py): the request id wraps everything, including CORS
+# answers; no-store and the body-size cap sit right after CORS so a refused request still
+# carries the CORS headers the browser app needs to read the error.
+_CORS_AT = MIDDLEWARE.index("corsheaders.middleware.CorsMiddleware")
+MIDDLEWARE[_CORS_AT + 1 : _CORS_AT + 1] = [
+    "config.middleware.NoStoreMiddleware",
+    "config.middleware.RequestSizeMiddleware",
+]
+MIDDLEWARE.insert(_CORS_AT, "config.middleware.RequestIdMiddleware")
+# The largest request body of the API, in bytes (a chat message is at most 500 characters).
+# A path with its own limit is listed with the error code that refuses a larger body.
+REQUEST_BODY_MAX_BYTES = 64 * 1024
+REQUEST_BODY_LIMITS: list[tuple[str, int, str]] = [
+    # A voice note: one clip of at most 5 MB plus the multipart framing.
+    (
+        r"/api/v1/conversations/[0-9a-fA-F-]{36}/voice",
+        6 * 1024 * 1024,
+        "audio_too_large",
+    ),
+]
 # Django 6 Content Security Policy — the policy itself is set per environment
 # (report-only in production.py until it has been tuned for the project).
 MIDDLEWARE.append("django.middleware.csp.ContentSecurityPolicyMiddleware")
+# Where uploaded images are kept (config/storage.py): the local disk, or the R2 bucket of this
+# environment. A service on an ephemeral disk (Render) must use r2, or uploads disappear at the
+# next deploy; a system check warns about it (core/checks.py).
+MEDIA_STORAGE = env_choice("MEDIA_STORAGE", "filesystem", {"filesystem", "r2"})
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": media_storage(MEDIA_STORAGE, os.environ),
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
     },
@@ -321,14 +391,24 @@ CELERY_TIMEZONE = TIME_ZONE
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {"()": "config.logging_filters.RequestIdFilter"},
+    },
     "formatters": {
         "plain": {
-            "format": f"{{asctime}} [{ENVIRONMENT}] {{levelname}} {{name}}: {{message}}",
+            "format": (
+                f"{{asctime}} [{ENVIRONMENT}] {{levelname}} {{name}} "
+                "[{request_id}]: {message}"
+            ),
             "style": "{",
         },
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "plain",
+            "filters": ["request_id"],
+        },
     },
     "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
     "loggers": {

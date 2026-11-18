@@ -2,6 +2,8 @@ import os
 
 from django.utils.csp import CSP
 
+from config.storage import public_media_sources
+
 from .base import *
 
 DEBUG = False
@@ -27,7 +29,8 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 # then switch the setting name to SECURE_CSP to enforce it.
 SECURE_CSP_REPORT_ONLY = {
     "default-src": [CSP.SELF],
-    "img-src": [CSP.SELF, "data:"],
+    # Uploaded images (logos, menu images, photos) come from the media bucket with R2.
+    "img-src": [CSP.SELF, "data:", *public_media_sources(STORAGES["default"])],
     "object-src": [CSP.NONE],
     "base-uri": [CSP.SELF],
     "frame-ancestors": [CSP.NONE],

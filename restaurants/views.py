@@ -1,0 +1,90 @@
+from typing import Any
+
+from django.conf import settings
+from django.db.models import Prefetch
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+from core.views import PublicAPIView
+from menu.models import MenuCategory
+from restaurants.models import RestaurantMenuImage
+
+from .serializers import (
+    NearbyQuerySerializer,
+    NearbyResponseSerializer,
+    RestaurantDetailSerializer,
+)
+from .services import find_nearby, public_restaurants
+
+
+class NearbyRestaurantsView(PublicAPIView):
+    """Polling list: it keeps its own shape and is not paginated (docs/api-conventions.md)."""
+
+    @extend_schema(
+        operation_id="restaurants_nearby",
+        tags=["restaurants"],
+        summary="List the restaurants around a point",
+        description=(
+            "Visible restaurants (active, subscription not suspended) whose parking lot is in range of the point (within the "
+            "lot's radius of its centre), nearest first. `distance_m` is the distance to the "
+            "restaurant itself. When none is in range, `restaurants` is empty and `nearest` "
+            "holds the closest active restaurant, so the app can say how far it is. "
+            "`nearest` is absent when `restaurants` is not empty and when no restaurant is "
+            "visible at all. This list is polled and is not paginated. No token is needed."
+        ),
+        parameters=[NearbyQuerySerializer],
+        responses={200: NearbyResponseSerializer},
+    )
+    def get(self, request: Request) -> Response:
+        query = NearbyQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        result = find_nearby(
+            query.validated_data["lat"],
+            query.validated_data["lng"],
+            require_screen_online=settings.REQUIRE_SCREEN_ONLINE,
+        )
+        data: dict[str, Any] = {"restaurants": result.restaurants}
+        if result.nearest is not None:
+            data["nearest"] = result.nearest
+        body = NearbyResponseSerializer(data, context={"request": request})
+        return Response(body.data)
+
+
+class RestaurantDetailView(PublicAPIView):
+    @extend_schema(
+        operation_id="restaurants_retrieve",
+        tags=["restaurants"],
+        summary="Read a restaurant and its menu",
+        description=(
+            "The restaurant's names, logo, brand colour, position and parking lot, the "
+            "menu images the chat sends, and the structured menu (categories, items, option "
+            "groups and options with their availability) that the item picker uses. A "
+            "restaurant that is not active or whose subscription is suspended is a `404`. No token is needed."
+        ),
+        responses={200: RestaurantDetailSerializer},
+    )
+    def get(self, request: Request, slug: str) -> Response:
+        restaurant = get_object_or_404(
+            public_restaurants()
+            .select_related("parking_lot")
+            .prefetch_related(
+                Prefetch(
+                    "restaurants_restaurantmenuimage_set",
+                    queryset=RestaurantMenuImage.objects.all(),
+                    to_attr="menu_images",
+                ),
+                Prefetch(
+                    "menu_menucategory_set",
+                    queryset=MenuCategory.objects.filter(
+                        is_active=True
+                    ).prefetch_related("items__option_groups__options"),
+                    to_attr="menu",
+                ),
+            ),
+            slug=slug,
+        )
+        return Response(
+            RestaurantDetailSerializer(restaurant, context={"request": request}).data
+        )

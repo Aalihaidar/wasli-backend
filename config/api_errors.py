@@ -32,6 +32,9 @@ class ErrorCode409Enum(models.TextChoices):
     """Stable codes of a ``409`` conflict. A new conflict code is added here and nowhere else."""
 
     ORDER_INVALID_TRANSITION = "order_invalid_transition"
+    ACCOUNT_EXISTS = "account_exists"
+    CONTACT_ALREADY_SET = "contact_already_set"
+    NO_PENDING_CONTACT = "no_pending_contact"
 
 
 class Error409Serializer(serializers.Serializer):  # type: ignore[misc]
@@ -45,3 +48,43 @@ class Error409ResponseSerializer(serializers.Serializer):  # type: ignore[misc]
 
     type = serializers.ChoiceField(choices=ClientErrorEnum.choices)
     errors = Error409Serializer(many=True)
+
+
+class ErrorCode403Enum(models.TextChoices):
+    """Stable codes of a ``403``."""
+
+    PERMISSION_DENIED = "permission_denied"
+    ACCOUNT_NOT_VERIFIED = "account_not_verified"
+
+
+class Error403Serializer(serializers.Serializer):  # type: ignore[misc]
+    code = serializers.ChoiceField(choices=ErrorCode403Enum.choices)
+    detail = serializers.CharField()
+    attr = serializers.CharField(allow_null=True)
+
+
+class Error403ResponseSerializer(serializers.Serializer):  # type: ignore[misc]
+    """``403``: not allowed for this caller or in this state."""
+
+    type = serializers.ChoiceField(choices=ClientErrorEnum.choices)
+    errors = Error403Serializer(many=True)
+
+
+class ErrorCode429Enum(models.TextChoices):
+    """Stable codes of a ``429``."""
+
+    THROTTLED = "throttled"
+    TOO_MANY_ATTEMPTS = "too_many_attempts"
+
+
+class Error429Serializer(serializers.Serializer):  # type: ignore[misc]
+    code = serializers.ChoiceField(choices=ErrorCode429Enum.choices)
+    detail = serializers.CharField()
+    attr = serializers.CharField(allow_null=True)
+
+
+class Error429ResponseSerializer(serializers.Serializer):  # type: ignore[misc]
+    """``429``: too many requests, or too many wrong attempts at a code."""
+
+    type = serializers.ChoiceField(choices=ClientErrorEnum.choices)
+    errors = Error429Serializer(many=True)

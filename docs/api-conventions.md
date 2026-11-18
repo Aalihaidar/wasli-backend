@@ -11,6 +11,9 @@ Version in the path: `/api/v1/...`. A breaking change gets a new version (`/api/
 the old one (see `docs/api-workflow.md`). The `SCHEMA_PATH_PREFIX` setting already keeps the
 version out of operation ids and tags.
 
+Paths have no trailing slash (`/api/v1/config`, `/api/v1/restaurants/{slug}`), as in the contract the two
+teams agreed. A request with a trailing slash is a `404`.
+
 ## One error body
 
 Every error raised inside a DRF view has the same body, so a client has a single error parser. The
@@ -33,6 +36,13 @@ template ships it with [drf-standardized-errors](https://github.com/ghazi-git/dr
   (dotted for nested data) or `null` when it is about the request as a whole.
 - This is **not** RFC 9457 problem details. The format is the package's own; what the contract
   gives a client is that it is documented and typed.
+
+The set of error codes is open. Every feature that can fail in a new way adds a code, and the error responses share the
+same lists, so each list (`ErrorCode<status>Enum` in the schema) is declared `x-extensible-enum`, not `enum`
+(`config/openapi_hooks.py`): adding a code is not a breaking change, and the contract check does not fail on it. A client
+treats a code it does not know as a generic failure of the HTTP status, and a generated client keeps the code as a string.
+The description of each list still names every code. Other enums (a language, a channel, an order status) stay closed.
+Removing or renaming a code is a breaking change as always. See [ADR 0012](adr/0012-error-codes-are-an-open-set.md).
 
 What the contract documents: the 400, 401, 403, 404 and 429 responses of each operation that can return
 them. The 400 body is one shared schema (`Error400Response`, from `config/api_errors.py`), because
@@ -81,6 +91,14 @@ converts to the user's time zone for display only. Dates without a time are `YYY
 - Use HTTP status codes for the outcome (`201` created, `204` no content, `400` invalid, `401`/`403`
   not authenticated/allowed, `404` not found, `409` conflict) and keep them in the schema.
 - An empty list is `200` with an empty `results`, never `404`.
+- Never declare a nullable object reference. A value that may be missing is an optional
+  property, absent from the response when it has no value (for example `nearest` on
+  `GET /api/v1/restaurants/nearby`). Nullable scalars, such as `logo_url`, are allowed. The
+  generated clients read an optional reference as a nullable field, but not a nullable `allOf`
+  reference. Declare such a field without `help_text`, so the schema keeps a bare `$ref`, and put
+  its explanation in the operation description.
+- A value list that grows with features (error codes, `order_type`) is a string declared with
+  `x-extensible-enum`, never a closed `enum` (ADR 0012).
 
 ## Project rules
 
@@ -113,7 +131,7 @@ Decisions specific to this project, on top of the defaults above.
 
 - Everyone with an account (`users.User`) signs in with one identifier plus a password. The login field is named `username` and accepts a username, an email address or a phone number: a value with `@` is an email, a valid phone number (UAE numbers without a country code are accepted) is a phone, anything else is a username. Matching ignores case, spaces and phone formatting. A username has 3 to 30 characters (letters, digits, `.`, `_`, `-`), starts with a letter and has no `@`.
 - Restaurant staff (admin and cashier) always have a username and sign in with it (`POST /api/v1/auth/login`), then send `Authorization: Token <token>`. The platform team signs in to the Django admin with email.
-- Customers sign up with a full name, an email address or a phone number, and a password. A six-digit code sent to that email or phone proves it; verifying it issues the customer token, sent as `Authorization: Customer <token>`. An unverified account cannot sign in or order. Codes expire after 10 minutes, allow five attempts and have a resend limit. From the account settings a customer can add the contact they did not give at sign-up (an email or a phone number); it is confirmed with a code sent to it and saved on the account only after that. Changing a contact that is already on the account is not offered. There is no anonymous customer session. The endpoint shapes are agreed in an API request before they are built.
+- Customers sign up with a full name, an email address or a phone number, and a password. A six-digit code sent to that email or phone proves it; verifying it issues the customer token, sent as `Authorization: Customer <token>`. An unverified account cannot sign in or order. A customer who signed up with an email must also verify a phone number before the first order (decided 2026-11-12; it comes with the pilot, and its error code is agreed in an API request first). Codes expire after 10 minutes, allow five attempts and have a resend limit. From the account settings a customer can add the contact they did not give at sign-up (an email or a phone number); it is confirmed with a code sent to it and saved on the account only after that. Changing a contact that is already on the account is not offered. There is no anonymous customer session. The endpoint shapes are agreed in an API request before they are built.
 - Every restaurant-owned resource is scoped to the caller's restaurant. Staff of one restaurant can never read or change another restaurant's data.
 
 ### Media

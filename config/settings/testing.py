@@ -7,7 +7,10 @@ CELERY_TASK_ALWAYS_EAGER = True
 # Tests never call a real assistant provider: the fake adapter replays recorded outputs.
 AI_PROVIDER = "fake"
 # No collectstatic in tests: plain storage instead of the hashed manifest.
+# Tests never reach a bucket, whatever the environment says (a developer's .env may point at
+# staging): images are kept in memory.
 STORAGES = {
     **STORAGES,
+    "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
