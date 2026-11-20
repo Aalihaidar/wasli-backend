@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models, transaction
 
+from core.locales import ARABIC_OPTIONAL_HELP, ArabicFallbackMixin, arabic_or_english
 from core.tenancy import RestaurantOwnedModel, align_with_parent
 
 MAX_ALIASES = 20
@@ -36,9 +37,11 @@ def clean_aliases(value: object) -> list[str]:
     return cleaned
 
 
-class MenuCategory(RestaurantOwnedModel):
+class MenuCategory(ArabicFallbackMixin, RestaurantOwnedModel):
     name_en = models.CharField(max_length=150)
-    name_ar = models.CharField(max_length=150)
+    name_ar = models.CharField(
+        max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
+    )
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -50,16 +53,18 @@ class MenuCategory(RestaurantOwnedModel):
         return f"{self.restaurant}: {self.name_en}"
 
 
-class MenuItem(RestaurantOwnedModel):
+class MenuItem(ArabicFallbackMixin, RestaurantOwnedModel):
     """A dish or drink. The price is in minor units (fils); the client never sends one."""
 
     category = models.ForeignKey(
         MenuCategory, on_delete=models.PROTECT, related_name="items"
     )
     name_en = models.CharField(max_length=150)
-    name_ar = models.CharField(max_length=150)
+    name_ar = models.CharField(
+        max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
+    )
     description_en = models.TextField(blank=True)
-    description_ar = models.TextField(blank=True)
+    description_ar = models.TextField(blank=True, help_text=ARABIC_OPTIONAL_HELP)
     price_minor = models.PositiveIntegerField(help_text="In fils: 1250 is 12.50 AED.")
     image = models.ImageField(upload_to="menu/items/", blank=True)
     # Unavailable items stay on the menu but cannot be ordered.
@@ -73,6 +78,10 @@ class MenuItem(RestaurantOwnedModel):
 
     def __str__(self) -> str:
         return self.name_en
+
+    @property
+    def description_ar_display(self) -> str:
+        return arabic_or_english(self.description_ar, self.description_en)
 
     def clean(self) -> None:
         super().clean()
@@ -88,7 +97,7 @@ class MenuItem(RestaurantOwnedModel):
         self.aliases = clean_aliases(self.aliases)
 
 
-class OptionGroup(RestaurantOwnedModel):
+class OptionGroup(ArabicFallbackMixin, RestaurantOwnedModel):
     """A choice attached to an item (size, milk, extras). ``min_select`` 1 or more makes it
     required; ``max_select`` is how many options the customer may pick."""
 
@@ -96,7 +105,9 @@ class OptionGroup(RestaurantOwnedModel):
         MenuItem, on_delete=models.CASCADE, related_name="option_groups"
     )
     name_en = models.CharField(max_length=150)
-    name_ar = models.CharField(max_length=150)
+    name_ar = models.CharField(
+        max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
+    )
     min_select = models.PositiveSmallIntegerField(default=0)
     max_select = models.PositiveSmallIntegerField(
         default=1, validators=[MinValueValidator(1)]
@@ -136,7 +147,7 @@ class OptionGroup(RestaurantOwnedModel):
             align_with_parent(self, self.item, "item")
 
 
-class Option(RestaurantOwnedModel):
+class Option(ArabicFallbackMixin, RestaurantOwnedModel):
     """One choice inside an option group. The price change is added to the item's price and
     may be negative. Default options fill a required group the customer did not mention."""
 
@@ -144,7 +155,9 @@ class Option(RestaurantOwnedModel):
         OptionGroup, on_delete=models.CASCADE, related_name="options"
     )
     name_en = models.CharField(max_length=150)
-    name_ar = models.CharField(max_length=150)
+    name_ar = models.CharField(
+        max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
+    )
     price_delta_minor = models.IntegerField(
         default=0, help_text="In fils, added to the item's price: 200 is +2.00 AED."
     )

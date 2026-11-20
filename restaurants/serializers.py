@@ -11,6 +11,26 @@ from menu.models import MenuCategory, MenuItem, Option, OptionGroup
 
 from .models import ParkingLot, Restaurant, RestaurantMenuImage
 
+ARABIC_NAME_HELP = "The Arabic name, or the English name when there is no Arabic one."
+ARABIC_TEXT_HELP = "The Arabic text, or the English text when there is no Arabic one."
+
+
+def arabic_name(
+    source: str = "name_ar_display", *, read_only: bool = True
+) -> serializers.CharField:
+    """``name_ar`` as the API sends it: never empty, the English name stands in for a missing
+    Arabic one (a restaurant with an English-only menu). ``read_only`` keeps the schema as it
+    was: a model serializer's fields are read-only, the plain nearby serializer's are not."""
+    return serializers.CharField(
+        source=source, read_only=read_only, help_text=ARABIC_NAME_HELP
+    )
+
+
+def arabic_text(source: str) -> serializers.CharField:
+    return serializers.CharField(
+        source=source, read_only=True, help_text=ARABIC_TEXT_HELP
+    )
+
 
 class NearbyQuerySerializer(serializers.Serializer):  # type: ignore[misc]
     lat = serializers.FloatField(help_text="Latitude of the customer, in degrees.")
@@ -35,7 +55,7 @@ class ParkingLotSerializer(serializers.ModelSerializer):  # type: ignore[misc]
 class NearbyRestaurantSerializer(serializers.Serializer):  # type: ignore[misc]
     slug = serializers.CharField(source="restaurant.slug")
     name_en = serializers.CharField(source="restaurant.name_en")
-    name_ar = serializers.CharField(source="restaurant.name_ar")
+    name_ar = arabic_name("restaurant.name_ar_display", read_only=False)
     logo_url = serializers.ImageField(
         source="restaurant.logo", read_only=True, allow_null=True
     )
@@ -63,6 +83,7 @@ class NearbyResponseSerializer(serializers.Serializer):  # type: ignore[misc]
 
 class MenuImageSerializer(serializers.ModelSerializer):  # type: ignore[misc]
     image_url = serializers.ImageField(source="image", read_only=True)
+    caption_ar = arabic_text("caption_ar_display")
 
     class Meta:
         model = RestaurantMenuImage
@@ -71,6 +92,8 @@ class MenuImageSerializer(serializers.ModelSerializer):  # type: ignore[misc]
 
 
 class OptionSerializer(serializers.ModelSerializer):  # type: ignore[misc]
+    name_ar = arabic_name()
+
     class Meta:
         model = Option
         fields = (
@@ -85,6 +108,7 @@ class OptionSerializer(serializers.ModelSerializer):  # type: ignore[misc]
 
 
 class OptionGroupSerializer(serializers.ModelSerializer):  # type: ignore[misc]
+    name_ar = arabic_name()
     options = OptionSerializer(many=True, read_only=True)
 
     class Meta:
@@ -94,6 +118,8 @@ class OptionGroupSerializer(serializers.ModelSerializer):  # type: ignore[misc]
 
 
 class MenuItemSerializer(serializers.ModelSerializer):  # type: ignore[misc]
+    name_ar = arabic_name()
+    description_ar = arabic_text("description_ar_display")
     image_url = serializers.ImageField(source="image", read_only=True, allow_null=True)
     option_groups = OptionGroupSerializer(many=True, read_only=True)
 
@@ -114,6 +140,7 @@ class MenuItemSerializer(serializers.ModelSerializer):  # type: ignore[misc]
 
 
 class MenuCategorySerializer(serializers.ModelSerializer):  # type: ignore[misc]
+    name_ar = arabic_name()
     items = MenuItemSerializer(many=True, read_only=True)
 
     class Meta:
@@ -123,6 +150,7 @@ class MenuCategorySerializer(serializers.ModelSerializer):  # type: ignore[misc]
 
 
 class RestaurantDetailSerializer(serializers.ModelSerializer):  # type: ignore[misc]
+    name_ar = arabic_name()
     logo_url = serializers.ImageField(source="logo", read_only=True, allow_null=True)
     brand_colour = serializers.CharField(
         help_text="A hex colour such as `#1A73E8`, or empty when none is set."

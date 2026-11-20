@@ -80,6 +80,38 @@ def test_a_restaurant_can_be_added_in_the_admin(admin_client: Client) -> None:
     assert Restaurant.objects.filter(slug="new-cafe").exists()
 
 
+def test_a_restaurant_can_be_added_without_an_arabic_name(
+    admin_client: Client,
+) -> None:
+    lot = make_lot()
+
+    response = admin_client.post(
+        reverse("admin:restaurants_restaurant_add"),
+        {
+            "slug": "gulf-food",
+            "name_en": "Gulf Food",
+            "name_ar": "",
+            "is_active": "on",
+            "parking_lot": str(lot.pk),
+            "latitude": "25.2",
+            "longitude": "55.27",
+            "default_eta_minutes": "10",
+            "subscription_status": "trial",
+            "accepts_cash": "on",
+            "timezone": "Asia/Dubai",
+            "restaurants_staffmembership_set-TOTAL_FORMS": "0",
+            "restaurants_staffmembership_set-INITIAL_FORMS": "0",
+            "restaurants_restaurantmenuimage_set-TOTAL_FORMS": "0",
+            "restaurants_restaurantmenuimage_set-INITIAL_FORMS": "0",
+        },
+    )
+
+    assert response.status_code == 302
+    restaurant = Restaurant.objects.get(slug="gulf-food")
+    assert restaurant.name_ar == ""
+    assert restaurant.name_ar_display == "Gulf Food"
+
+
 def test_a_restaurant_cannot_be_deleted_in_the_admin(admin_client: Client) -> None:
     restaurant = make_restaurant()
 

@@ -116,7 +116,7 @@ Decisions specific to this project, on top of the defaults above.
 
 ### Languages
 
-- Arabic (`ar`) and English (`en`) only. Text shown to customers comes as a pair of fields (`name_en`, `name_ar`, `description_en`, `description_ar`); the API returns both and the client picks one.
+- Arabic (`ar`) and English (`en`) only. Text shown to customers comes as a pair of fields (`name_en`, `name_ar`, `description_en`, `description_ar`); the API returns both and the client picks one. The Arabic side is optional in the data (an English-only restaurant leaves it empty) but never empty in the API: where there is no Arabic text, the English text is returned in the `_ar` field, so a client never receives an empty name ([ADR 0014](adr/0014-optional-arabic-names.md)).
 - Chat messages are written by the server in the conversation's `locale`. A client renders them and never builds message text.
 
 ### Roles and permissions

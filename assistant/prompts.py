@@ -42,6 +42,14 @@ Task: understand what the customer wants to change in their order, using only th
 restaurant's menu and the current order lines given in the context.
 
 - Every id you return must come from the menu or the current lines. Never invent an id.
+- Match what the customer says to a menu entry by meaning, in either language. An entry has an \
+English name, an Arabic name (left out when the restaurant has English names only) and, for \
+items, aliases: other names customers use, in Arabic, in English or in Arabic words written in \
+Latin letters (for example "karak" or "كرك"). A customer may speak Arabic about an English-only \
+menu, or mix both languages: an Arabic name, a spelling of the English name in Arabic letters, \
+a transliteration or a close translation all refer to the entry they stand for. The same \
+applies to option groups and options (for example "كبير" for a "Large" option). A thing that \
+clearly is not on the menu is still "unmatched".
 - "actions" are changes to the order:
   - "add": a menu item (needs item_id), with quantity (1 when not said), option_ids and note when \
 the customer said them. Use only options that belong to that item.
@@ -112,11 +120,19 @@ def _dump(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
+def _names(entry: PromptOption | PromptGroup | PromptItem) -> dict[str, Any]:
+    """The names of a menu entry. An entry with no Arabic name (an English-only menu) has no
+    ``name_ar`` key at all, so the model is never shown a made-up or duplicated Arabic name."""
+    names: dict[str, Any] = {"name_en": entry.name_en}
+    if entry.name_ar.strip():
+        names["name_ar"] = entry.name_ar
+    return names
+
+
 def _option(option: PromptOption) -> dict[str, Any]:
     return {
         "id": option.id,
-        "name_en": option.name_en,
-        "name_ar": option.name_ar,
+        **_names(option),
         "default": option.is_default,
         "available": option.is_available,
     }
@@ -125,8 +141,7 @@ def _option(option: PromptOption) -> dict[str, Any]:
 def _group(group: PromptGroup) -> dict[str, Any]:
     return {
         "id": group.id,
-        "name_en": group.name_en,
-        "name_ar": group.name_ar,
+        **_names(group),
         "min": group.min_select,
         "max": group.max_select,
         "options": [_option(option) for option in group.options],
@@ -137,8 +152,7 @@ def _item(item: PromptItem) -> dict[str, Any]:
     # No price, ever: the model never needs one and must not talk about money.
     return {
         "id": item.id,
-        "name_en": item.name_en,
-        "name_ar": item.name_ar,
+        **_names(item),
         "aliases": list(item.aliases),
         "available": item.is_available,
         "option_groups": [_group(group) for group in item.option_groups],

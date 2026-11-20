@@ -283,3 +283,58 @@ class TestOption:
         make_option(make_group(make_item(make_category(b))))
 
         assert list(Option.objects.for_restaurant(a)) == [option_a]
+
+
+class TestEnglishOnlyMenu:
+    """A restaurant whose menu is in English only leaves every Arabic text empty."""
+
+    def test_every_arabic_name_can_be_left_empty(self) -> None:
+        restaurant = make_restaurant("cafe-en", name_ar="")
+        category = MenuCategory.objects.create(restaurant=restaurant, name_en="Drinks")
+        item = MenuItem.objects.create(
+            category=category, name_en="Karak tea", price_minor=500
+        )
+        group = OptionGroup.objects.create(item=item, name_en="Size")
+        option = Option.objects.create(group=group, name_en="Large")
+
+        for row in (restaurant, category, item, group, option):
+            row.full_clean()
+            assert row.name_ar == ""
+
+    def test_the_english_name_stands_in_for_the_missing_arabic_one(self) -> None:
+        restaurant = make_restaurant("cafe-en", name_ar="")
+        category = MenuCategory.objects.create(restaurant=restaurant, name_en="Drinks")
+        item = MenuItem.objects.create(
+            category=category,
+            name_en="Karak tea",
+            description_en="Strong and sweet",
+            price_minor=500,
+        )
+        group = OptionGroup.objects.create(item=item, name_en="Size")
+        option = Option.objects.create(group=group, name_en="Large")
+
+        assert restaurant.name_ar_display == "Cafe En"
+        assert category.name_ar_display == "Drinks"
+        assert item.name_ar_display == "Karak tea"
+        assert item.description_ar_display == "Strong and sweet"
+        assert group.name_ar_display == "Size"
+        assert option.name_ar_display == "Large"
+
+    def test_an_arabic_name_is_kept_when_there_is_one(self) -> None:
+        item = make_item(make_category(make_restaurant("cafe-ar")), "Karak tea")
+
+        assert item.name_ar == "شاي"
+        assert item.name_ar_display == "شاي"
+
+    def test_the_fallback_does_not_write_a_copy_into_the_database(self) -> None:
+        item = make_item(make_category(make_restaurant("cafe-en")), "Karak tea")
+        item.name_ar = ""
+        item.save()
+
+        item.name_en = "Chai karak"
+        item.save()
+        item.refresh_from_db()
+
+        # Renaming the English name changes what the Arabic side shows: no stale copy.
+        assert item.name_ar == ""
+        assert item.name_ar_display == "Chai karak"

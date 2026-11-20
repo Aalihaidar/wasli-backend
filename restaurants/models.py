@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
 
+from core.locales import ARABIC_OPTIONAL_HELP, ArabicFallbackMixin, arabic_or_english
 from core.models import BaseModel
 from core.money import CURRENCY
 from core.permissions import Role
@@ -46,7 +47,7 @@ class ParkingLot(BaseModel):
         return self.name
 
 
-class Restaurant(BaseModel):
+class Restaurant(ArabicFallbackMixin, BaseModel):
     class SubscriptionStatus(models.TextChoices):
         TRIAL = "trial", "Trial"
         ACTIVE = "active", "Active"
@@ -55,7 +56,9 @@ class Restaurant(BaseModel):
     # Used in URLs and QR codes (/r/<slug>).
     slug = models.SlugField(max_length=60, unique=True, validators=[_slug_validator])
     name_en = models.CharField(max_length=150)
-    name_ar = models.CharField(max_length=150)
+    name_ar = models.CharField(
+        max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
+    )
     # Empty means the default welcome text of the conversation engine.
     welcome_message_en = models.TextField(blank=True)
     welcome_message_ar = models.TextField(blank=True)
@@ -123,7 +126,9 @@ class RestaurantMenuImage(RestaurantOwnedModel):
 
     image = models.ImageField(upload_to="restaurants/menu/")
     caption_en = models.CharField(max_length=150, blank=True)
-    caption_ar = models.CharField(max_length=150, blank=True)
+    caption_ar = models.CharField(
+        max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
+    )
     sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -131,6 +136,10 @@ class RestaurantMenuImage(RestaurantOwnedModel):
 
     def __str__(self) -> str:
         return f"{self.restaurant} #{self.sort_order}"
+
+    @property
+    def caption_ar_display(self) -> str:
+        return arabic_or_english(self.caption_ar, self.caption_en)
 
 
 class StaffMembership(RestaurantOwnedModel):
