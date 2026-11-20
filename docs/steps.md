@@ -63,7 +63,7 @@ The checklist of everything to do in this repository, from a fresh copy of the t
 - [x] Settings → Advanced Security (dependency graph, Dependabot alerts and updates; private vulnerability reporting, CodeQL and secret scanning are offered only while the repository is public)
 - [x] Add the `gitleaks` secret scanner to pre-commit (the guard that works whether the repository is public or private)
 - [x] Import the three rulesets (`protect-main`, `protect-develop`, `protect-tags`) after **CI passed** had run once and `main` existed (enforced while the repository is public; GitHub does not enforce them on a private repository on the free plan)
-- [ ] While the repository is public: turn on private vulnerability reporting, CodeQL (Actions and Python), secret scanning and push protection, and set the repository description and topics (`docs/github-setup.md`, "Changing the repository's visibility")
+- [x] While the repository is public: turn on private vulnerability reporting, CodeQL (Actions and Python), secret scanning and push protection, and set the repository description and topics (`docs/github-setup.md`, "Changing the repository's visibility")
 - [x] Decide on image publishing: set `PUBLISH_IMAGE` (`ghcr` or `dockerhub`) or leave it unset
 - [ ] Verify the protection (direct pushes rejected, a topic branch cannot target `main`, only merge commits offered); the rulesets are in place, so this needs a test push, run once by the owner
 
