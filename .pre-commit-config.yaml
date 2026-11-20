@@ -59,8 +59,9 @@ repos:
         args: [--branch, main, --branch, develop]
 
   # Secret scanner: blocks a commit whose staged changes contain an API key, token or password (Gemini, Neon, Render,
-  # cloud providers, ...). It replaces GitHub secret scanning and push protection, which a private repository does not
-  # get. Real keys live only in `.env` (git-ignored) and in the hosting platform's environment variables.
+  # cloud providers, ...). It is the guard that works in every repository state: GitHub secret scanning and push
+  # protection exist only while the repository is public. Real keys live only in `.env` (git-ignored) and in the hosting
+  # platform's environment variables.
   # Allow a false positive in `.gitleaks.toml`, never with a blanket ignore.
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1

@@ -108,8 +108,11 @@ database it stays idle unless `BEAT_ON_EXTERNAL_DATABASE=true` is set in `.env`.
 Work happens on topic branches and pull requests into `develop`; `develop` opens a pull
 request into `main` only when needed (a release, or production needs the new code). The git
 hooks (Conventional Commits, no commits or pushes on `develop`/`main`) are installed with
-the container; the single required check is **CI passed**. GitHub rulesets cannot be
-enabled while the repository is private on the free plan, so the local hooks are the guard.
+the container; the single required check is **CI passed**. The three rulesets
+(`protect-main`, `protect-develop`, `protect-tags`) are enforced while the repository is
+public; GitHub does not enforce them on a private repository on the free plan, and the
+local hooks are the guard then (see "Changing the repository's visibility" in
+[`docs/github-setup.md`](docs/github-setup.md)).
 
 - Branches, hooks, SSH keys, CI and releases: [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)
 - GitHub settings, Actions permissions, environments, security and rulesets: [`docs/github-setup.md`](docs/github-setup.md)
