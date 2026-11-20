@@ -2,8 +2,13 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from core.permissions import Role
-from restaurants.models import ParkingLot, Restaurant, StaffMembership
+from core.permissions import Permission, Role, role_has_permission
+from restaurants.models import (
+    ParkingLot,
+    Restaurant,
+    RestaurantMenuImage,
+    StaffMembership,
+)
 from restaurants.tests.factories import make_lot, make_member, make_restaurant
 from users.models import User
 
@@ -226,3 +231,73 @@ class TestLastAdmin:
         member = make_member(make_restaurant(), "boss", Role.ADMIN)
 
         assert member.role == "admin"
+
+
+class TestEnglishOnlyRestaurant:
+    def test_the_arabic_name_and_caption_can_be_left_empty(self) -> None:
+        restaurant = make_restaurant("gulf-food", name_ar="")
+
+        restaurant.full_clean()
+
+        assert restaurant.name_ar == ""
+        assert restaurant.name_ar_display == "Gulf Food"
+
+    def test_a_menu_image_caption_falls_back_to_english(self) -> None:
+        restaurant = make_restaurant("gulf-food", name_ar="")
+        image = RestaurantMenuImage(
+            restaurant=restaurant, image="x.jpg", caption_en="Main menu"
+        )
+
+        image.full_clean(exclude=["image"])
+
+        assert image.caption_ar_display == "Main menu"
+        image.caption_ar = "القائمة"
+        assert image.caption_ar_display == "القائمة"
+
+
+class TestStaffAccountsOfARestaurant:
+    """One restaurant can have the accounts it needs: one admin that does everything, or an
+    admin and cashiers, or several of each."""
+
+    @pytest.mark.parametrize(
+        ("username", "role"),
+        [
+            ("gulf-food-admin", Role.ADMIN),
+            ("gulf-food-admin2", Role.ADMIN),
+            ("gulf-food-cashier", Role.CASHIER),
+            ("gulf-food-cashier2", Role.CASHIER),
+            ("gulf-food-cashier3", Role.CASHIER),
+        ],
+    )
+    def test_the_naming_convention_is_a_valid_username(
+        self, username: str, role: Role
+    ) -> None:
+        member = make_member(make_restaurant("gulf-food"), username, role)
+
+        member.full_clean()
+
+        assert len(username) <= 30
+
+    def test_a_restaurant_can_have_several_admins_and_several_cashiers(self) -> None:
+        restaurant = make_restaurant("gulf-food")
+        make_member(restaurant, "gulf-food-admin", Role.ADMIN)
+        make_member(restaurant, "gulf-food-admin2", Role.ADMIN)
+        make_member(restaurant, "gulf-food-cashier", Role.CASHIER)
+        make_member(restaurant, "gulf-food-cashier2", Role.CASHIER)
+
+        roles = list(
+            StaffMembership.objects.filter(restaurant=restaurant)
+            .order_by("user__username")
+            .values_list("role", flat=True)
+        )
+
+        assert roles == ["admin", "admin", "cashier", "cashier"]
+
+    def test_a_small_restaurant_can_work_with_one_admin_account_only(self) -> None:
+        restaurant = make_restaurant("gulf-food")
+        admin = make_member(restaurant, "gulf-food-admin", Role.ADMIN)
+
+        # The one admin sees and decides orders (what a cashier does) and manages the rest.
+        assert role_has_permission(admin.role, Permission.ORDERS_VIEW)
+        assert role_has_permission(admin.role, Permission.ORDERS_DECIDE)
+        assert role_has_permission(admin.role, Permission.MENU_EDIT)

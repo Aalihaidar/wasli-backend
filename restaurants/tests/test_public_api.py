@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from menu.models import MenuCategory
+from menu.models import MenuCategory, MenuItem, Option, OptionGroup
 from menu.tests.factories import make_category, make_group, make_item, make_option
 from restaurants.models import Restaurant, RestaurantMenuImage
 from restaurants.tests.factories import make_lot, make_restaurant
@@ -372,3 +372,61 @@ class TestReservedSlug:
             restaurant.clean()
 
         assert "slug" in error.value.message_dict
+
+
+class TestEnglishOnlyRestaurant:
+    """No Arabic text is stored, yet every Arabic field of the API is filled with the English
+    text, so a client never receives an empty name."""
+
+    def test_the_detail_falls_back_to_english_for_every_arabic_field(
+        self, api: APIClient
+    ) -> None:
+        restaurant = make_restaurant("gulf-food", name_ar="")
+        category = MenuCategory.objects.create(restaurant=restaurant, name_en="Burgers")
+        item = MenuItem.objects.create(
+            category=category,
+            name_en="Chicken burger",
+            description_en="Grilled, with fries",
+            price_minor=1800,
+        )
+        group = OptionGroup.objects.create(item=item, name_en="Size")
+        Option.objects.create(group=group, name_en="Large", price_delta_minor=300)
+        RestaurantMenuImage.objects.create(
+            restaurant=restaurant, image="menu/1.jpg", caption_en="Main menu"
+        )
+
+        body = api.get("/api/v1/restaurants/gulf-food").json()
+
+        assert body["name_ar"] == "Gulf Food"
+        [image] = body["menu_images"]
+        assert image["caption_ar"] == "Main menu"
+        [cat] = body["menu"]
+        assert cat["name_ar"] == "Burgers"
+        [entry] = cat["items"]
+        assert entry["name_ar"] == "Chicken burger"
+        assert entry["description_ar"] == "Grilled, with fries"
+        [grp] = entry["option_groups"]
+        assert grp["name_ar"] == "Size"
+        assert grp["options"][0]["name_ar"] == "Large"
+
+    def test_nearby_falls_back_to_english_for_the_name(self, api: APIClient) -> None:
+        make_at("gulf-food", 25.2002, 55.2702, name_ar="")
+
+        [entry] = api.get(NEARBY, INSIDE).json()["restaurants"]
+
+        assert entry["name_en"] == "Gulf Food"
+        assert entry["name_ar"] == "Gulf Food"
+
+    def test_an_arabic_text_is_returned_as_it_was_entered(self, api: APIClient) -> None:
+        restaurant = make_restaurant("cafe-ar", name_ar="مقهى")
+        item = make_item(make_category(restaurant), "Karak tea")
+        item.description_en = "Strong"
+        item.description_ar = "قوي"
+        item.save()
+
+        body = api.get("/api/v1/restaurants/cafe-ar").json()
+
+        assert body["name_ar"] == "مقهى"
+        entry = body["menu"][0]["items"][0]
+        assert entry["name_ar"] == "شاي"
+        assert entry["description_ar"] == "قوي"

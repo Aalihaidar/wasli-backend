@@ -116,6 +116,7 @@ local hooks are the guard then (see "Changing the repository's visibility" in
 
 - Branches, hooks, SSH keys, CI and releases: [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)
 - GitHub settings, Actions permissions, environments, security and rulesets: [`docs/github-setup.md`](docs/github-setup.md)
+- Entering a restaurant, its menu, images and staff accounts in the Django admin: [`docs/data-entry.md`](docs/data-entry.md)
 - The dev image is pinned in `docker-compose.yml`; Dependabot proposes updates as pull requests.
 - CI builds and smoke-tests the production image on every pull request and pushes nothing. To publish it, set the repository variable `PUBLISH_IMAGE` (`ghcr` or `dockerhub`), see [`docs/github-setup.md`](docs/github-setup.md) section 3.
 

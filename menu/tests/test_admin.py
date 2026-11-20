@@ -73,6 +73,31 @@ def test_an_item_is_added_with_aed_and_aliases(admin_client: Client) -> None:
     assert item.restaurant_id == restaurant.pk
 
 
+def test_an_item_is_added_without_an_arabic_name(admin_client: Client) -> None:
+    category = make_category(make_restaurant("cafe-en"))
+
+    response = admin_client.post(
+        reverse("admin:menu_menuitem_add"),
+        {
+            "category": str(category.pk),
+            "name_en": "Chicken burger",
+            "name_ar": "",
+            "price_minor": "18",
+            "aliases": "برجر دجاج\nzinger",
+            "is_available": "on",
+            "sort_order": "0",
+            "option_groups-TOTAL_FORMS": "0",
+            "option_groups-INITIAL_FORMS": "0",
+        },
+    )
+
+    assert response.status_code == 302
+    item = MenuItem.objects.get(name_en="Chicken burger")
+    assert item.name_ar == ""
+    assert item.name_ar_display == "Chicken burger"
+    assert item.aliases == ["برجر دجاج", "zinger"]
+
+
 def test_a_bad_price_keeps_the_form_open(admin_client: Client) -> None:
     category = make_category(make_restaurant("cafe-a"))
 
