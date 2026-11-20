@@ -7,14 +7,8 @@ from django.utils.safestring import SafeString
 
 from core.admin_display import BadgeKind, badge, thumbnail
 
-from .models import ParkingLot, Restaurant, RestaurantMenuImage, StaffMembership
+from .models import Restaurant, RestaurantMenuImage, StaffMembership
 from .services import screen_is_online
-
-
-@admin.register(ParkingLot)
-class ParkingLotAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
-    list_display = ("name", "address", "radius_m", "latitude", "longitude")
-    search_fields = ("name", "address")
 
 
 class RestaurantMenuImageInline(admin.TabularInline):  # type: ignore[type-arg]
@@ -42,7 +36,7 @@ class RestaurantAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         "logo_thumb",
         "name_en",
         "slug",
-        "parking_lot",
+        "service_radius_m",
         "is_active",
         "site_online",
         "subscription",
@@ -50,7 +44,7 @@ class RestaurantAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         "subscription_paid_until",
     )
     list_display_links = ("name_en", "slug")
-    list_filter = ("is_active", "is_demo", "subscription_status", "parking_lot")
+    list_filter = ("is_active", "is_demo", "subscription_status")
     search_fields = ("name_en", "name_ar", "slug", "phone")
     prepopulated_fields: ClassVar[dict[str, Sequence[str]]] = {"slug": ("name_en",)}
     readonly_fields = (
@@ -65,7 +59,15 @@ class RestaurantAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         (None, {"fields": ("slug", "name_en", "name_ar", "is_active", "is_demo")}),
         (
             "Place",
-            {"fields": ("parking_lot", "address", "latitude", "longitude", "phone")},
+            {
+                "fields": (
+                    "address",
+                    "latitude",
+                    "longitude",
+                    "service_radius_m",
+                    "phone",
+                )
+            },
         ),
         (
             "Look",

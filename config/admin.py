@@ -38,7 +38,7 @@ APP_NAMES = {
 }
 # The order of the models inside a section (a model not listed follows, alphabetically).
 MODEL_ORDER = {
-    "restaurants": ("Restaurant", "ParkingLot", "StaffMembership"),
+    "restaurants": ("Restaurant", "StaffMembership"),
     "menu": ("MenuCategory", "MenuItem", "OptionGroup"),
     "customers": ("Customer", "CustomerBlock", "CustomerSession"),
 }

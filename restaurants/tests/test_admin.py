@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from core.permissions import Role
 from restaurants.models import Restaurant, StaffMembership
-from restaurants.tests.factories import PASSWORD, make_lot, make_member, make_restaurant
+from restaurants.tests.factories import PASSWORD, make_member, make_restaurant
 from users.models import User
 
 pytestmark = pytest.mark.django_db
@@ -22,11 +22,6 @@ def test_the_pages_load(admin_client: Client) -> None:
     restaurant = make_restaurant()
     member = make_member(restaurant, "sara", Role.ADMIN)
     pages = [
-        reverse("admin:restaurants_parkinglot_changelist"),
-        reverse("admin:restaurants_parkinglot_add"),
-        reverse(
-            "admin:restaurants_parkinglot_change", args=[restaurant.parking_lot.pk]
-        ),
         reverse("admin:restaurants_restaurant_changelist"),
         reverse("admin:restaurants_restaurant_add"),
         reverse("admin:restaurants_restaurant_change", args=[restaurant.pk]),
@@ -52,8 +47,6 @@ def test_the_restaurant_list_shows_the_demo_flag_as_a_filter(
 
 
 def test_a_restaurant_can_be_added_in_the_admin(admin_client: Client) -> None:
-    lot = make_lot()
-
     response = admin_client.post(
         reverse("admin:restaurants_restaurant_add"),
         {
@@ -61,7 +54,6 @@ def test_a_restaurant_can_be_added_in_the_admin(admin_client: Client) -> None:
             "name_en": "New Cafe",
             "name_ar": "مقهى جديد",
             "is_active": "on",
-            "parking_lot": str(lot.pk),
             "latitude": "25.2",
             "longitude": "55.27",
             "default_eta_minutes": "10",
@@ -83,8 +75,6 @@ def test_a_restaurant_can_be_added_in_the_admin(admin_client: Client) -> None:
 def test_a_restaurant_can_be_added_without_an_arabic_name(
     admin_client: Client,
 ) -> None:
-    lot = make_lot()
-
     response = admin_client.post(
         reverse("admin:restaurants_restaurant_add"),
         {
@@ -92,7 +82,6 @@ def test_a_restaurant_can_be_added_without_an_arabic_name(
             "name_en": "Gulf Food",
             "name_ar": "",
             "is_active": "on",
-            "parking_lot": str(lot.pk),
             "latitude": "25.2",
             "longitude": "55.27",
             "default_eta_minutes": "10",
@@ -110,6 +99,39 @@ def test_a_restaurant_can_be_added_without_an_arabic_name(
     restaurant = Restaurant.objects.get(slug="gulf-food")
     assert restaurant.name_ar == ""
     assert restaurant.name_ar_display == "Gulf Food"
+
+
+def test_a_restaurant_is_added_with_and_without_a_service_distance(
+    admin_client: Client,
+) -> None:
+    base = {
+        "name_en": "Gulf Food",
+        "name_ar": "",
+        "is_active": "on",
+        "latitude": "25.2",
+        "longitude": "55.27",
+        "default_eta_minutes": "10",
+        "subscription_status": "trial",
+        "accepts_cash": "on",
+        "timezone": "Asia/Dubai",
+        "restaurants_staffmembership_set-TOTAL_FORMS": "0",
+        "restaurants_staffmembership_set-INITIAL_FORMS": "0",
+        "restaurants_restaurantmenuimage_set-TOTAL_FORMS": "0",
+        "restaurants_restaurantmenuimage_set-INITIAL_FORMS": "0",
+    }
+    add = reverse("admin:restaurants_restaurant_add")
+
+    with_radius = admin_client.post(
+        add, {**base, "slug": "with-radius", "service_radius_m": "300"}
+    )
+    without_radius = admin_client.post(
+        add, {**base, "slug": "no-radius", "service_radius_m": ""}
+    )
+
+    assert with_radius.status_code == 302
+    assert without_radius.status_code == 302
+    assert Restaurant.objects.get(slug="with-radius").service_radius_m == 300
+    assert Restaurant.objects.get(slug="no-radius").service_radius_m is None
 
 
 def test_a_restaurant_cannot_be_deleted_in_the_admin(admin_client: Client) -> None:

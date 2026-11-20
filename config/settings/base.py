@@ -175,6 +175,10 @@ MESSAGING_BACKEND = env_choice("MESSAGING_BACKEND", "outbox", {"outbox", "disabl
 OUTBOX_RETENTION_HOURS = env_int("OUTBOX_RETENTION_HOURS", 24, minimum=1)
 # True: list a restaurant only while its site polled in the last 60 seconds.
 REQUIRE_SCREEN_ONLINE = env_bool("REQUIRE_SCREEN_ONLINE", default=False)
+# The platform-wide search distance of GET /restaurants/nearby, in metres: a restaurant is
+# listed only for a customer within it, whatever its own service distance (a restaurant with
+# no service distance of its own is listed everywhere inside this distance).
+NEARBY_SEARCH_RADIUS_M = env_int("NEARBY_SEARCH_RADIUS_M", 3000, minimum=1)
 # The assistant layer only understands input (orders, car details, voice); it never writes
 # replies or prices. "fake" replays recorded outputs and is what the tests use.
 AI_PROVIDER = env_choice("AI_PROVIDER", "gemini", {"gemini", "fake"})

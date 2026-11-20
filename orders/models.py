@@ -36,7 +36,10 @@ class OrderStatus(models.TextChoices):
 
 
 class RejectionReason(models.TextChoices):
-    ITEM_UNAVAILABLE = "item_unavailable", "Item unavailable"
+    ITEM_UNAVAILABLE = (
+        "item_unavailable",
+        "Part of the order is finished or unavailable",
+    )
     TOO_BUSY = "too_busy", "Too busy"
     CLOSING_SOON = "closing_soon", "Closing soon"
     TOO_FAR = "too_far", "Customer is too far"
@@ -111,10 +114,9 @@ class Order(RestaurantOwnedModel):
         default=LocationSource.NONE.value,
     )
     location_captured_at = models.DateTimeField(null=True, blank=True)
-    # Metres from the customer to the restaurant (shown to staff) and to the parking lot's
-    # centre (used by the rules and the distance band). Empty without a position.
+    # Metres from the customer to the restaurant: shown to staff and the base of the distance
+    # band. Empty without a position.
     distance_m = models.PositiveIntegerField(null=True, blank=True)
-    lot_distance_m = models.PositiveIntegerField(null=True, blank=True)
     eta_minutes = models.PositiveSmallIntegerField(
         null=True, blank=True, choices=ETA_CHOICES
     )
@@ -175,8 +177,9 @@ class Order(RestaurantOwnedModel):
 
     @property
     def distance_band(self) -> DistanceBand:
-        """In the lot, near it, far, or unknown; derived on read, never stored."""
-        return distance_band(self.lot_distance_m, self.restaurant.parking_lot.radius_m)
+        """Within the restaurant's service distance, near it, far, or unknown; derived on read,
+        never stored."""
+        return distance_band(self.distance_m, self.restaurant.service_radius_m)
 
     def clean(self) -> None:
         super().clean()

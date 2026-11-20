@@ -23,6 +23,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0012](0012-error-codes-are-an-open-set.md) | Error codes are an open set: extensible lists, not closed enums | accepted |
 | [0013](0013-django-admin-appearance.md) | How the Django admin looks: built-in polish now, a third-party theme later (options and costs) | accepted |
 | [0014](0014-optional-arabic-names.md) | Arabic names are optional, the English text stands in when they are empty | accepted, built |
+| [0015](0015-service-distance-replaces-the-parking-lot.md) | A restaurant's service distance replaces the parking lot (changes the range rule of 0008) | accepted, built |
 
 ## Writing a record
 

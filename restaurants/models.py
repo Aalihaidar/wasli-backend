@@ -28,25 +28,6 @@ RESERVED_SLUGS = frozenset({"nearby"})
 ROLE_CHOICES = [(role.value, role.value.title()) for role in Role]
 
 
-class ParkingLot(BaseModel):
-    """A parking area shared by one or more restaurants. A customer is "at" a restaurant when
-    they are within ``radius_m`` metres of the lot's centre."""
-
-    name = models.CharField(max_length=150)
-    address = models.CharField(max_length=255, blank=True)
-    latitude = models.FloatField(validators=_latitude_validators)
-    longitude = models.FloatField(validators=_longitude_validators)
-    radius_m = models.PositiveIntegerField(
-        default=300, validators=[MinValueValidator(1)]
-    )
-
-    class Meta:
-        ordering = ("name",)
-
-    def __str__(self) -> str:
-        return self.name
-
-
 class Restaurant(ArabicFallbackMixin, BaseModel):
     class SubscriptionStatus(models.TextChoices):
         TRIAL = "trial", "Trial"
@@ -71,8 +52,13 @@ class Restaurant(ArabicFallbackMixin, BaseModel):
     address = models.CharField(max_length=255, blank=True)
     latitude = models.FloatField(validators=_latitude_validators)
     longitude = models.FloatField(validators=_longitude_validators)
-    parking_lot = models.ForeignKey(
-        ParkingLot, on_delete=models.PROTECT, related_name="restaurants"
+    # How far from the restaurant it serves cars, in metres. Empty means no limit of its own:
+    # customers within the platform search distance (NEARBY_SEARCH_RADIUS_M) still see it.
+    service_radius_m = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text="Metres from the restaurant that it serves cars. Leave empty for no limit.",
     )
     currency = models.CharField(max_length=3, default=CURRENCY, editable=False)
     timezone = models.CharField(max_length=64, default="Asia/Dubai")

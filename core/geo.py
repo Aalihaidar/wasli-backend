@@ -6,8 +6,15 @@ from enum import StrEnum
 EARTH_RADIUS_M = 6_371_008.8  # mean Earth radius
 
 
+# The reference distance for the label when a restaurant sets no service distance. It only
+# shapes the label shown to staff: nothing is ever refused because of it.
+DEFAULT_BAND_RADIUS_M = 300
+
+
 class DistanceBand(StrEnum):
-    """How far a customer is from a restaurant's parking lot, for the restaurant's screen."""
+    """How far a customer is from the restaurant, against the restaurant's service distance,
+    for the restaurant's screen. ``in_lot`` is the contract's name for "within the service
+    distance": the apps already use it, and renaming it would break them for no gain."""
 
     IN_LOT = "in_lot"
     NEAR = "near"
@@ -52,12 +59,20 @@ def is_valid_location(lat: float, lng: float, accuracy_m: float | None = None) -
     return accuracy_m is None or (math.isfinite(accuracy_m) and accuracy_m >= 0)
 
 
-def distance_band(lot_distance_m: float | None, radius_m: int) -> DistanceBand:
-    """Band of a distance to the parking lot centre: within the radius, up to 3x, or farther."""
-    if lot_distance_m is None:
+def distance_band(
+    distance_m: float | None, service_radius_m: int | None = None
+) -> DistanceBand:
+    """Band of a distance to the restaurant: within its service distance (``in_lot``), up to
+    three times it (``near``) or farther (``far``); ``unknown`` without a position.
+
+    A restaurant with no service distance is measured against ``DEFAULT_BAND_RADIUS_M``, so
+    the label still tells the staff something. The distance in metres is always shown too.
+    """
+    if distance_m is None:
         return DistanceBand.UNKNOWN
-    if lot_distance_m <= radius_m:
+    radius = DEFAULT_BAND_RADIUS_M if service_radius_m is None else service_radius_m
+    if distance_m <= radius:
         return DistanceBand.IN_LOT
-    if lot_distance_m <= 3 * radius_m:
+    if distance_m <= 3 * radius:
         return DistanceBand.NEAR
     return DistanceBand.FAR

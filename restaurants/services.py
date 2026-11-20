@@ -68,34 +68,34 @@ def find_nearby(
     lat: float,
     lng: float,
     *,
+    search_radius_m: int,
     require_screen_online: bool,
     now: datetime | None = None,
 ) -> NearbyResult:
-    """Visible restaurants (``public_restaurants``) whose parking lot is in range of the point,
-    nearest first.
+    """Visible restaurants (``public_restaurants``) that serve the point, nearest first.
 
-    A restaurant is in range when the point is within the lot's ``radius_m`` of the lot's
-    centre. ``distance_m`` is the distance to the restaurant itself. When
+    A restaurant serves the point when the customer is within ``search_radius_m`` of it (the
+    platform-wide search distance) and, if the restaurant sets a ``service_radius_m``, within
+    that too. A restaurant with no service distance of its own is listed everywhere inside the
+    search distance. ``distance_m`` is the distance to the restaurant itself. When
     ``require_screen_online`` is set, a restaurant whose screen is offline is left out
     (and cannot be the ``nearest`` either).
     """
     in_range: list[NearbyEntry] = []
     everyone: list[NearbyEntry] = []
-    restaurants = public_restaurants().select_related("parking_lot")
-    for restaurant in restaurants:
+    for restaurant in public_restaurants():
         is_open = screen_is_online(restaurant, now)
         if require_screen_online and not is_open:
             continue
+        metres = haversine_m(lat, lng, restaurant.latitude, restaurant.longitude)
         entry = NearbyEntry(
-            restaurant=restaurant,
-            distance_m=round(
-                haversine_m(lat, lng, restaurant.latitude, restaurant.longitude)
-            ),
-            is_open=is_open,
+            restaurant=restaurant, distance_m=round(metres), is_open=is_open
         )
         everyone.append(entry)
-        lot = restaurant.parking_lot
-        if haversine_m(lat, lng, lot.latitude, lot.longitude) <= lot.radius_m:
+        limit = search_radius_m
+        if restaurant.service_radius_m is not None:
+            limit = min(limit, restaurant.service_radius_m)
+        if metres <= limit:
             in_range.append(entry)
 
     def order(entry: NearbyEntry) -> tuple[int, str]:

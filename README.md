@@ -35,7 +35,7 @@ Application libraries and their exact versions are pinned in `pyproject.toml` an
 | --- | --- |
 | `users` | The one account table: sign-in with a username, an email or a phone number |
 | `core` | Shared base model, money and distance helpers, permission codes, restaurant scoping, the public `config` endpoint |
-| `restaurants` | Parking lots, restaurants, menu images and staff memberships (roles `admin` and `cashier`), the public restaurant endpoints |
+| `restaurants` | Restaurants (with an optional service distance), menu images and staff memberships (roles `admin` and `cashier`), the public restaurant endpoints |
 | `menu` | Categories, items, option groups and options |
 | `customers` | Customers, their sessions and cars, restaurant blocks, the customer token authentication, sign-up with a verification code, sign-in and password reset |
 | `messaging` | The outbox of emails and SMS (shown in the admin on local and staging, refused in production) and the delivery interface |
