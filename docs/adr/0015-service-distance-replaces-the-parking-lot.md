@@ -27,10 +27,12 @@ accepts or rejects the order, with a reason such as "too far".
   service distance, `near` up to three times it, `far` beyond, `unknown` without a position. A restaurant with no service
   distance is measured against a reference of 300 m (`DEFAULT_BAND_RADIUS_M`) for the label only. The name `in_lot` is kept
   because the apps already use it.
-- **Nothing refuses an order for its distance.** The restaurant sees the distance, the label and a map and decides. When
-  `LOCATION_CHECK=enforce` is built (the product, later), an order outside the service distance is refused with
-  `outside_service_distance` (it was named `outside_parking_lot`); a restaurant with no service distance has nothing to
-  enforce.
+- **Nothing refuses an order for its distance.** The restaurant sees the distance, the label and a map and decides. No
+  error code for this exists in the contract (the old name `outside_parking_lot` was only a planned name and is gone).
+  When `LOCATION_CHECK=enforce` is built (the product, later), how a customer outside the service distance is told (a
+  message in the chat, as the contract does for anything the customer can fix, or an error named
+  `outside_service_distance`) is agreed first in an API request issue; a restaurant with no service distance has nothing
+  to enforce.
 - **Where the customer is parked** comes from two things: the free answer to the chat's car question (`parking_note`) and the
   position the app sends. The staff order shows both.
 - **Reject reasons.** The list is unchanged, and the note stays optional except for `other`. The code `item_unavailable` is
