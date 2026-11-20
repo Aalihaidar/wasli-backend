@@ -12,7 +12,7 @@ exist only for a presentation and a second set of data to keep in step with the 
 
 - There is no demo mode. Staging is what restaurant managers see; production is the final product. The word "demo" is not
   used as a mode in code or documents.
-- There is no seed command. The platform team enters parking lots, restaurants, menu images, items and staff accounts in
+- There is no seed command. The platform team enters restaurants, menu images, items and staff accounts in
   the Django admin of each environment. The superuser is created with `createsuperuser`.
 - `Restaurant.is_demo` stays as an informational flag for a test or fake restaurant (an admin column and filter). It
   changes no behaviour.

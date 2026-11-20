@@ -1,20 +1,13 @@
 """Small helpers that build valid rows for tests (invented data only)."""
 
 from core.permissions import Role
-from restaurants.models import ParkingLot, Restaurant, StaffMembership
+from restaurants.models import Restaurant, StaffMembership
 from users.models import User
 
 PASSWORD = "s3cret-pass-4-tests"
 
 
-def make_lot(name: str = "Marina Lot", **extra: object) -> ParkingLot:
-    values: dict[str, object] = {"latitude": 25.2, "longitude": 55.27, **extra}
-    return ParkingLot.objects.create(name=name, **values)
-
-
-def make_restaurant(
-    slug: str = "cafe-one", lot: ParkingLot | None = None, **extra: object
-) -> Restaurant:
+def make_restaurant(slug: str = "cafe-one", **extra: object) -> Restaurant:
     values: dict[str, object] = {
         "name_en": slug.replace("-", " ").title(),
         "name_ar": "مقهى",
@@ -22,11 +15,7 @@ def make_restaurant(
         "longitude": 55.2701,
         **extra,
     }
-    return Restaurant.objects.create(
-        slug=slug,
-        parking_lot=lot or make_lot(name=f"Lot of {slug}"),
-        **values,
-    )
+    return Restaurant.objects.create(slug=slug, **values)
 
 
 def make_user(username: str) -> User:

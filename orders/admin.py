@@ -96,7 +96,6 @@ class OrderAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         "location_accuracy_m",
         "location_captured_at",
         "distance_m",
-        "lot_distance_m",
         "eta_minutes",
         "rejection_reason_code",
         "rejection_note",

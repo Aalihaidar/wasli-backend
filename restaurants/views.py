@@ -27,8 +27,10 @@ class NearbyRestaurantsView(PublicAPIView):
         tags=["restaurants"],
         summary="List the restaurants around a point",
         description=(
-            "Visible restaurants (active, subscription not suspended) whose parking lot is in range of the point (within the "
-            "lot's radius of its centre), nearest first. `distance_m` is the distance to the "
+            "Visible restaurants (active, subscription not suspended) that serve the point, "
+            "nearest first: the customer is within the platform search distance of the "
+            "restaurant and, when the restaurant sets a service distance (`service_radius_m`), "
+            "within that too. `distance_m` is the distance to the "
             "restaurant itself. When none is in range, `restaurants` is empty and `nearest` "
             "holds the closest active restaurant, so the app can say how far it is. "
             "`nearest` is absent when `restaurants` is not empty and when no restaurant is "
@@ -43,6 +45,7 @@ class NearbyRestaurantsView(PublicAPIView):
         result = find_nearby(
             query.validated_data["lat"],
             query.validated_data["lng"],
+            search_radius_m=settings.NEARBY_SEARCH_RADIUS_M,
             require_screen_online=settings.REQUIRE_SCREEN_ONLINE,
         )
         data: dict[str, Any] = {"restaurants": result.restaurants}
@@ -58,7 +61,7 @@ class RestaurantDetailView(PublicAPIView):
         tags=["restaurants"],
         summary="Read a restaurant and its menu",
         description=(
-            "The restaurant's names, logo, brand colour, position and parking lot, the "
+            "The restaurant's names, logo, brand colour, position and service distance, the "
             "menu images the chat sends, and the structured menu (categories, items, option "
             "groups and options with their availability) that the item picker uses. A "
             "restaurant that is not active or whose subscription is suspended is a `404`. No token is needed."
@@ -67,9 +70,7 @@ class RestaurantDetailView(PublicAPIView):
     )
     def get(self, request: Request, slug: str) -> Response:
         restaurant = get_object_or_404(
-            public_restaurants()
-            .select_related("parking_lot")
-            .prefetch_related(
+            public_restaurants().prefetch_related(
                 Prefetch(
                     "restaurants_restaurantmenuimage_set",
                     queryset=RestaurantMenuImage.objects.all(),

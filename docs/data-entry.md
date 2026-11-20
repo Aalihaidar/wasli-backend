@@ -2,31 +2,30 @@
 
 There is no seed command: the platform team enters each restaurant, its menu and its staff accounts by hand in the Django
 admin of the environment (`/admin/`). This guide is the checklist, in the order that works, with the rules for images,
-Arabic names, aliases, parking and accounts. Never invent a menu: the restaurant supplies its own.
+Arabic names, aliases, service distance and accounts. Never invent a menu: the restaurant supplies its own.
 
 ## Collect first
 
 - The restaurant's name (English, and Arabic when it has one), its address and phone, and its logo.
 - The **map position of the door** (latitude and longitude).
-- The **parking area** customers use: its name, its centre and a radius (see [Parking area](#parking-area)).
+- How far from the restaurant it serves cars, if it wants a limit (see
+  [Location and service distance](#location-and-service-distance)).
 - The menu as photos, and every item with its price in AED, its sizes and options, and its Arabic name when there is one.
 - Who will be the restaurant's admin and cashiers (see [Staff accounts](#staff-accounts)).
 
 ## Order of entry
 
-1. **Parking lot** (Restaurants, Parking lots): name, address, latitude, longitude of the **centre**, radius in metres
-   (300 by default).
-2. **Restaurant** (Restaurants, Restaurants): the slug (filled from the English name; lowercase letters, digits and single
-   hyphens, never `nearby`), the names, **Active** ticked, the parking lot, the restaurant's own latitude and longitude,
-   phone and address, the logo and an optional brand colour (`#RRGGBB`), optional welcome messages. Leave `is_demo` off for
-   a real restaurant. The default subscription status `trial` is fine: only `suspended` hides a restaurant. Upload the
+1. **Restaurant** (Restaurants, Restaurants): the slug (filled from the English name; lowercase letters, digits and single
+   hyphens, never `nearby`), the names, **Active** ticked, the address, the restaurant's own latitude and longitude, the
+   optional service distance in metres, the phone, the logo and an optional brand colour (`#RRGGBB`), optional welcome
+   messages. Leave `is_demo` off for a real restaurant. The default subscription status `trial` is fine: only `suspended` hides a restaurant. Upload the
    menu images on the same page, with a caption and a sort order.
-3. **Menu** (Menu, Menu categories): one category per section, then its items on the same page, with the price **typed in
+2. **Menu** (Menu, Menu categories): one category per section, then its items on the same page, with the price **typed in
    AED** (the admin stores fils), availability, an optional photo and the aliases. Sizes and extras are option groups on
    the item's page, with options that carry a price difference in AED (a default option fills a required group the
    customer did not mention).
-4. **Staff accounts**: create the users, then add them to the restaurant as members.
-5. **Check** the result (see [Check it](#check-it)).
+3. **Staff accounts**: create the users, then add them to the restaurant as members.
+4. **Check** the result (see [Check it](#check-it)).
 
 Coordinates: latitude first, then longitude. In the UAE the first is about 24 to 25 and the second about 54 to 55. The admin
 accepts swapped values, so check them on a map. To copy a position, press and hold the spot in Google Maps.
@@ -63,18 +62,23 @@ Gemini key in the environment: without it the spike uses the fake provider, whic
 python manage.py assistant_spike order --restaurant <slug> --locale ar --text "ابغى برجر دجاج كبير"
 ```
 
-## Parking area
+## Location and service distance
 
-A **parking lot** here is the area where the restaurant's customers park. It does not have to be a formal lot: for a
-roadside restaurant it is the stretch in front of the door; for a mall or a shared lot it is that lot.
+There is no parking lot to enter. Customers may park anywhere, and a restaurant has only its own location and, if it
+wants, the distance it serves.
 
-- **Centre:** the middle of where the cars stand (in front of the door for a roadside restaurant).
-- **Name:** shown to customers, so use the real name of the lot or the place ("Gulf Food parking area").
-- **Radius:** the default is 300 m, right for a shared lot. A roadside restaurant can use about 150 m. The radius decides
-  who sees the restaurant on the map (the customer must be within it of the centre) and the label on an order (inside the
-  radius `in_lot`, up to three times it `near`, beyond it `far`).
-- The customer's exact place (level, bay, street, landmark) is not part of this record: the chat's car question collects it
-  in one free answer.
+- **Position:** the restaurant's door, as latitude and longitude (the admin's *Place* section).
+- **Service distance (`service_radius_m`):** metres from the restaurant that it serves cars, for example 300. **Leave it
+  empty for no limit of its own.**
+- **Who sees the restaurant on the map:** a customer within the **search distance** of the restaurant (3,000 m by default,
+  the `NEARBY_SEARCH_RADIUS_M` setting) and, if the restaurant sets a service distance, within that too. A restaurant with no
+  service distance is listed for everyone inside the search distance.
+- **What the restaurant sees on an order:** the customer's position on a map, the distance in metres and a label: `in_lot`
+  inside the service distance, `near` up to three times it, `far` beyond, `unknown` when the customer did not share the
+  position. With no service distance the label is measured against 300 m. Nothing is refused because of the distance: the
+  restaurant decides and can reject with a reason such as "Customer is too far".
+- **Where the car is:** the customer types it in the chat's one car question (level, bay, street, landmark), and the app
+  sends the phone's position. The staff order shows both.
 
 ## Images
 
@@ -118,7 +122,7 @@ endpoints come with D3: until then the accounts exist but cannot sign in to the 
 
 - `/api/v1/restaurants/<slug>` shows the restaurant, its images and the whole menu (with an English-only restaurant, the
   Arabic fields hold the English text).
-- `/api/v1/restaurants/nearby?lat=<lat>&lng=<lng>` with the **parking area's own centre** lists it, with `is_open` and a
+- `/api/v1/restaurants/nearby?lat=<lat>&lng=<lng>` with a point **close to the restaurant** lists it, with `is_open` and a
   distance. Never use a real customer's position: a position is personal data, and the server log prints the path only.
 - The logo and the menu images load, which also proves the media bucket works on that environment.
 

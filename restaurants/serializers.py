@@ -9,7 +9,7 @@ from rest_framework import serializers
 from core.geo import is_valid_location
 from menu.models import MenuCategory, MenuItem, Option, OptionGroup
 
-from .models import ParkingLot, Restaurant, RestaurantMenuImage
+from .models import Restaurant, RestaurantMenuImage
 
 ARABIC_NAME_HELP = "The Arabic name, or the English name when there is no Arabic one."
 ARABIC_TEXT_HELP = "The Arabic text, or the English text when there is no Arabic one."
@@ -32,6 +32,20 @@ def arabic_text(source: str) -> serializers.CharField:
     )
 
 
+class OptionalIntegerField(serializers.IntegerField):  # type: ignore[misc]
+    """An integer that is left out of the response, never ``null``, when it has no value: the
+    contract has no nullable references and a missing value is an optional property."""
+
+    def get_attribute(self, instance: object) -> object:
+        value = super().get_attribute(instance)
+        if value is None:
+            raise serializers.SkipField()
+        return value
+
+
+SERVICE_RADIUS_HELP = "Metres from the restaurant that it serves cars. Absent when the restaurant sets no limit."
+
+
 class NearbyQuerySerializer(serializers.Serializer):  # type: ignore[misc]
     lat = serializers.FloatField(help_text="Latitude of the customer, in degrees.")
     lng = serializers.FloatField(help_text="Longitude of the customer, in degrees.")
@@ -45,13 +59,6 @@ class NearbyQuerySerializer(serializers.Serializer):  # type: ignore[misc]
         return attrs
 
 
-class ParkingLotSerializer(serializers.ModelSerializer):  # type: ignore[misc]
-    class Meta:
-        model = ParkingLot
-        fields = ("name", "latitude", "longitude", "radius_m")
-        read_only_fields = fields
-
-
 class NearbyRestaurantSerializer(serializers.Serializer):  # type: ignore[misc]
     slug = serializers.CharField(source="restaurant.slug")
     name_en = serializers.CharField(source="restaurant.name_en")
@@ -61,6 +68,11 @@ class NearbyRestaurantSerializer(serializers.Serializer):  # type: ignore[misc]
     )
     latitude = serializers.FloatField(source="restaurant.latitude")
     longitude = serializers.FloatField(source="restaurant.longitude")
+    service_radius_m = OptionalIntegerField(
+        source="restaurant.service_radius_m",
+        required=False,
+        help_text=SERVICE_RADIUS_HELP,
+    )
     distance_m = serializers.IntegerField(
         help_text="Metres from the customer to the restaurant."
     )
@@ -70,7 +82,7 @@ class NearbyRestaurantSerializer(serializers.Serializer):  # type: ignore[misc]
 
 
 class NearestRestaurantSerializer(NearbyRestaurantSerializer):
-    parking_lot = ParkingLotSerializer(source="restaurant.parking_lot", read_only=True)
+    """The closest restaurant when none serves the point: the same fields as a nearby entry."""
 
 
 class NearbyResponseSerializer(serializers.Serializer):  # type: ignore[misc]
@@ -155,7 +167,9 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):  # type: ignore[m
     brand_colour = serializers.CharField(
         help_text="A hex colour such as `#1A73E8`, or empty when none is set."
     )
-    parking_lot = ParkingLotSerializer(read_only=True)
+    service_radius_m = OptionalIntegerField(
+        required=False, help_text=SERVICE_RADIUS_HELP
+    )
     menu_images = MenuImageSerializer(many=True, read_only=True)
     menu = MenuCategorySerializer(many=True, read_only=True)
 
@@ -170,7 +184,7 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):  # type: ignore[m
             "latitude",
             "longitude",
             "currency",
-            "parking_lot",
+            "service_radius_m",
             "menu_images",
             "menu",
         )

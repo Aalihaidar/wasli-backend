@@ -17,8 +17,9 @@ opening hours, and the assistant layer does not exist yet. The apps need a meani
 - **Visibility.** The public endpoints start from the restaurants that are active and whose subscription is not
   suspended (`restaurants.services.public_restaurants`). Any other restaurant is not listed and its page is a `404`.
   Reactivating it makes it visible again.
-- **Range.** A restaurant is listed when the customer is within the radius of its parking lot's centre; `distance_m` is the
-  distance to the restaurant itself.
+- **Range.** A restaurant is listed when the customer is within the platform search distance of it and, when it sets a
+  service distance, within that too; `distance_m` is the distance to the restaurant itself (changed by
+  [ADR 0015](0015-service-distance-replaces-the-parking-lot.md): it used to be the radius of a parking lot's centre).
 - **`ai_enabled`** is true for the fake provider, and for the Gemini provider when its key and model are set. The daily
   request budget and the five minutes after a provider failure are added with the assistant layer.
 - `nearby` is a reserved slug, so no restaurant can take the name of a route.

@@ -4,39 +4,13 @@ from django.db import IntegrityError
 
 from core.permissions import Permission, Role, role_has_permission
 from restaurants.models import (
-    ParkingLot,
-    Restaurant,
     RestaurantMenuImage,
     StaffMembership,
 )
-from restaurants.tests.factories import make_lot, make_member, make_restaurant
+from restaurants.tests.factories import make_member, make_restaurant
 from users.models import User
 
 pytestmark = pytest.mark.django_db
-
-
-class TestParkingLot:
-    def test_defaults(self) -> None:
-        lot = make_lot()
-
-        assert lot.radius_m == 300
-        assert lot.pk.version == 4
-        assert str(lot) == "Marina Lot"
-
-    @pytest.mark.parametrize(("lat", "lng"), [(91, 0), (-91, 0), (0, 181), (0, -181)])
-    def test_a_position_outside_the_globe_is_rejected(
-        self, lat: float, lng: float
-    ) -> None:
-        lot = ParkingLot(name="Bad", latitude=lat, longitude=lng)
-
-        with pytest.raises(ValidationError):
-            lot.full_clean()
-
-    def test_the_radius_must_be_positive(self) -> None:
-        lot = ParkingLot(name="Bad", latitude=0, longitude=0, radius_m=0)
-
-        with pytest.raises(ValidationError):
-            lot.full_clean()
 
 
 class TestRestaurant:
@@ -85,12 +59,29 @@ class TestRestaurant:
             restaurant.full_clean()
         assert "brand_colour" in error.value.message_dict
 
-    def test_a_restaurant_keeps_its_parking_lot(self) -> None:
+    def test_the_service_distance_is_optional(self) -> None:
         restaurant = make_restaurant()
 
-        with pytest.raises(Exception, match="protected"):
-            restaurant.parking_lot.delete()
-        assert Restaurant.objects.filter(pk=restaurant.pk).exists()
+        restaurant.full_clean()
+
+        assert restaurant.service_radius_m is None
+
+    def test_a_service_distance_can_be_set(self) -> None:
+        restaurant = make_restaurant("gulf-food", service_radius_m=300)
+
+        restaurant.full_clean()
+        restaurant.refresh_from_db()
+
+        assert restaurant.service_radius_m == 300
+
+    @pytest.mark.parametrize("value", [0, -5])
+    def test_the_service_distance_must_be_positive_when_given(self, value: int) -> None:
+        restaurant = make_restaurant()
+        restaurant.service_radius_m = value
+
+        with pytest.raises(ValidationError) as error:
+            restaurant.full_clean()
+        assert "service_radius_m" in error.value.message_dict
 
 
 class TestStaffMembership:
