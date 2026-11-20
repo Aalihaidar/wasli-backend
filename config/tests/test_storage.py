@@ -139,11 +139,12 @@ class TestPublicMediaSources:
         """The admin's thumbnails and the apps' pictures come from the bucket, so the policy
         (report-only now, enforced later) must name it. Run in a fresh interpreter: the settings
         are read once, when Django starts."""
+        import json
         import os
         import subprocess
         import sys
 
-        def img_src(mode: str) -> str:
+        def img_src(mode: str) -> list[str]:
             env = {
                 "PATH": os.environ["PATH"],
                 "HOME": str(tmp_path),
@@ -158,14 +159,18 @@ class TestPublicMediaSources:
                     "-W",
                     "ignore",
                     "-c",
-                    "import config.settings.production as p; print(p.SECURE_CSP_REPORT_ONLY['img-src'])",
+                    "import json, config.settings.production as p; "
+                    "print(json.dumps(list(p.SECURE_CSP_REPORT_ONLY['img-src'])))",
                 ],
                 env=env,
                 capture_output=True,
                 text=True,
                 check=True,
             )
-            return out.stdout
+            sources: list[str] = json.loads(out.stdout)
+            return sources
 
-        assert "https://pub-1234abcd.r2.dev" in img_src("r2")
-        assert "r2.dev" not in img_src("filesystem")
+        # Whole-list comparisons: the bucket is one exact source with R2, and nothing else is
+        # added on the local disk.
+        assert img_src("r2") == ["'self'", "data:", "https://pub-1234abcd.r2.dev"]
+        assert img_src("filesystem") == ["'self'", "data:"]

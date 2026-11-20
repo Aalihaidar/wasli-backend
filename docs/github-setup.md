@@ -163,7 +163,7 @@ readable by everyone who can read the repository.
 | Code scanning → CodeQL | Default setup, query suite **Default**. Languages: **Actions** from day one (analyses the workflow files). **Add Python as soon as the project has code**: Settings → Advanced Security → CodeQL analysis → ⋯ → Edit configuration → tick *Python* → Save. A Django project that scans only the workflows is not scanned at all |
 | Secret Protection → Secret scanning | On |
 | Secret Protection → Push protection | **On** |
-| Secret Protection → Validity checks | On |
+| Secret Protection → Validity checks | On, when GitHub offers it (the page can show only *Push protection*, as on 2026-11-20) |
 
 **Private repositories.** Private vulnerability reporting, CodeQL code scanning
 and Secret Protection (secret scanning, push protection, validity checks) are
@@ -193,8 +193,8 @@ each time it changes.
 1. Scan the whole history for secrets once (`gitleaks git --redact`); the
    pre-commit hook only sees the staged changes of a commit.
 2. Settings → Advanced Security: turn on private vulnerability reporting, CodeQL
-   default setup (languages *Actions* and *Python*), secret scanning, push
-   protection and validity checks.
+   default setup (languages *Actions* and *Python*), secret scanning and push
+   protection (and validity checks, when the page offers them).
 3. The rulesets and automatic merge start being enforced and offered. Nothing to
    import again: the rulesets stay in the repository settings.
 4. `.github/SECURITY.md` names both reporting routes and needs no change.
