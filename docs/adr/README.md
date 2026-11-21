@@ -24,6 +24,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0013](0013-django-admin-appearance.md) | How the Django admin looks: built-in polish now, a third-party theme later (options and costs) | accepted |
 | [0014](0014-optional-arabic-names.md) | Arabic names are optional, the English text stands in when they are empty | accepted, built |
 | [0015](0015-service-distance-replaces-the-parking-lot.md) | A restaurant's service distance replaces the parking lot (changes the range rule of 0008) | accepted, built |
+| [0016](0016-nested-menu-categories.md) | Menu categories can nest, up to three levels (category, subcategory, sub-subcategory) | accepted, built |
 
 ## Writing a record
 

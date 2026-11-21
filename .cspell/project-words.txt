@@ -104,3 +104,7 @@ karak
 shawarma
 dajaj
 rrggbb
+fujairah
+squoosh
+mozjpeg
+oxipng

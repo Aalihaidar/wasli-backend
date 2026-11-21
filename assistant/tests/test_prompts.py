@@ -228,3 +228,29 @@ class TestEnglishOnlyMenu:
 
         assert "speak Arabic about an English-only menu" in request.system
         assert "left out when the restaurant has English names only" in request.system
+
+
+class TestNestedMenu:
+    def test_items_in_subcategories_reach_the_prompt(self) -> None:
+        restaurant = make_restaurant("gulf-food")
+        burgers = make_category(restaurant, "Burgers")
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        chicken = make_category(restaurant, "Chicken", parent=grilled)
+        make_item(burgers, "House burger")
+        make_item(chicken, "Chicken burger")
+
+        names = {i.name_en for i in build_prompt_menu(restaurant).items}
+
+        assert names == {"House burger", "Chicken burger"}
+
+    def test_items_under_an_inactive_category_never_reach_the_prompt(self) -> None:
+        restaurant = make_restaurant("gulf-food")
+        burgers = make_category(restaurant, "Burgers", is_active=False)
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        make_item(burgers, "Hidden one")
+        make_item(grilled, "Hidden two")
+        make_item(make_category(restaurant, "Drinks"), "Karak tea")
+
+        names = {i.name_en for i in build_prompt_menu(restaurant).items}
+
+        assert names == {"Karak tea"}

@@ -2,7 +2,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from menu.models import MenuItem, Option, OptionGroup
+from menu.models import MenuCategory, MenuItem, Option, OptionGroup
 from menu.tests.factories import make_category, make_group, make_item, make_option
 from restaurants.tests.factories import PASSWORD, make_restaurant
 from users.models import User
@@ -278,3 +278,95 @@ class TestPolish:
         ).content.decode()
 
         assert "karak" in page and "description_en" in page and 'name="aliases"' in page
+
+
+class TestSubcategories:
+    def _post_category(
+        self, client: Client, restaurant: object, name: str, parent: object | None
+    ) -> object:
+        return client.post(
+            reverse("admin:menu_menucategory_add"),
+            {
+                "restaurant": str(restaurant.pk),  # type: ignore[attr-defined]
+                "parent": str(parent.pk) if parent else "",  # type: ignore[attr-defined]
+                "name_en": name,
+                "name_ar": "",
+                "sort_order": "0",
+                "is_active": "on",
+                "items-TOTAL_FORMS": "0",
+                "items-INITIAL_FORMS": "0",
+            },
+        )
+
+    def test_a_subcategory_is_added_with_a_parent(self, admin_client: Client) -> None:
+        restaurant = make_restaurant("cafe-a")
+        burgers = make_category(restaurant, "Burgers")
+
+        response = self._post_category(admin_client, restaurant, "Grilled", burgers)
+
+        assert response.status_code == 302  # type: ignore[attr-defined]
+        grilled = MenuCategory.objects.get(name_en="Grilled")
+        assert grilled.parent_id == burgers.pk
+        assert grilled.depth == 2
+
+    def test_a_category_is_still_added_without_a_parent(
+        self, admin_client: Client
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+
+        response = self._post_category(admin_client, restaurant, "Burgers", None)
+
+        assert response.status_code == 302  # type: ignore[attr-defined]
+        assert MenuCategory.objects.get(name_en="Burgers").parent_id is None
+
+    def test_a_parent_from_another_restaurant_keeps_the_form_open(
+        self, admin_client: Client
+    ) -> None:
+        a, b = make_restaurant("cafe-a"), make_restaurant("cafe-b")
+        top = make_category(a, "Burgers")
+
+        response = self._post_category(admin_client, b, "Grilled", top)
+
+        assert response.status_code == 200  # type: ignore[attr-defined]
+        assert not MenuCategory.objects.filter(name_en="Grilled").exists()
+
+    def test_a_third_level_is_added_and_a_fourth_is_refused(
+        self, admin_client: Client
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        one = make_category(restaurant, "One")
+        two = make_category(restaurant, "Two", parent=one)
+
+        ok = self._post_category(admin_client, restaurant, "Three", two)
+        three = MenuCategory.objects.get(name_en="Three")
+        refused = self._post_category(admin_client, restaurant, "Four", three)
+
+        assert ok.status_code == 302  # type: ignore[attr-defined]
+        assert refused.status_code == 200  # type: ignore[attr-defined]
+        assert not MenuCategory.objects.filter(name_en="Four").exists()
+
+    def test_the_parent_choices_leave_out_a_category_that_cannot_have_children(
+        self, admin_client: Client
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        one = make_category(restaurant, "One")
+        two = make_category(restaurant, "Two", parent=one)
+        make_category(restaurant, "Three", parent=two)
+
+        page = admin_client.get(reverse("admin:menu_menucategory_add"))
+
+        html = page.content.decode()
+        assert "Cafe A: One" in html
+        assert "Cafe A: One &gt; Two" in html
+        assert "Cafe A: One &gt; Two &gt; Three" not in html
+
+    def test_the_list_shows_the_path_of_each_category(
+        self, admin_client: Client
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        burgers = make_category(restaurant, "Burgers")
+        make_category(restaurant, "Grilled", parent=burgers)
+
+        page = admin_client.get(reverse("admin:menu_menucategory_changelist"))
+
+        assert "Burgers &gt; Grilled" in page.content.decode()

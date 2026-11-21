@@ -27,8 +27,41 @@ Arabic names, aliases, service distance and accounts. Never invent a menu: the r
 3. **Staff accounts**: create the users, then add them to the restaurant as members.
 4. **Check** the result (see [Check it](#check-it)).
 
-Coordinates: latitude first, then longitude. In the UAE the first is about 24 to 25 and the second about 54 to 55. The admin
-accepts swapped values, so check them on a map. To copy a position, press and hold the spot in Google Maps.
+Coordinates: latitude first, then longitude. In the UAE latitude is about 22.5 to 26 and longitude about 51.5 to 56.5 (for
+example Abu Dhabi city 24.5 and 54.4, Al Ain 24.2 and 55.7, Dubai 25.2 and 55.3, Fujairah 25.1 and 56.3), so the first
+number is the smaller one. The admin accepts swapped values, so check the pair on a map.
+
+To copy a position in Google Maps on a computer, zoom in on the entrance (the satellite layer helps), right-click the spot
+and click the two numbers at the top of the menu to copy them. On a phone, press and hold the spot; the numbers appear in
+the search box. Paste the first number in *Latitude* and the second in *Longitude*.
+
+## Menu structure: categories, subcategories and options
+
+A menu has **up to three levels** of categories: a category, its **subcategories** and their **sub-subcategories**. Nesting
+is optional: a restaurant with a short menu uses one level. Items can be put at any level, so a heading can have a few dishes
+of its own next to its subheadings. An item holds option groups (sizes, extras), which hold options.
+
+To make a subcategory, add a category (Menu, Menu categories, Add) and choose its **Parent**:
+
+- **Parent empty:** a top-level category.
+- **Parent = a top-level category:** a subcategory. **Parent = a subcategory:** a sub-subcategory.
+- The parent must be a category of the **same restaurant**. The list of parents shows the path (`Burgers > Grilled`) and leaves
+  out a category that is already on the third level, because a fourth level is not allowed.
+- To move a category, change its Parent. The admin refuses a loop (a category inside itself or inside one of its own
+  subcategories) and a move that would make the branch deeper than three levels.
+- Use **Sort order** inside each level to set the order customers see. The categories reach the app depth first: a category,
+  then its subcategories, then the next category.
+- **Hiding a category hides everything inside it.** Untick *Is active* on a category to hide its subcategories and all their
+  items, for customers and for the assistant. A category with subcategories cannot be deleted: move or delete them first.
+
+Two things that are not categories:
+
+- **Sizes, flavours, milk and extras are option groups** on the item (for example *Size* with *Small* and *Large*, each with
+  its price difference in AED), not categories and not separate items.
+- **Do not repeat an item** in two categories. If a dish appears under two headings in the printed menu, enter it once.
+
+Keep the structure as close to the printed menu as it is useful. A category is only a heading: there is no need for one for
+every printed page, and a short menu needs no subcategories at all.
 
 ## English-only restaurants
 
@@ -52,7 +85,8 @@ Add, for each item:
 - Arabic words written in Latin letters when that is how people type them ("burger dajaj");
 - the common alternative spellings ("chai karak", "cheese toast").
 
-Do not repeat the English name itself, and do not add another item's name. Sizes, milk and extras do not take aliases: the
+Do not repeat the English name itself, and do not add another item's name. Do not give an item an alias that is a general
+word shared by many items (for example "burger"): when a customer says it, the assistant asks which one, which is right. Sizes, milk and extras do not take aliases: the
 assistant matches them by meaning from their names ("كبير" for "Large").
 
 After entering the menu, test the matching with the real provider and the real menu, using invented sentences. It needs the
@@ -83,17 +117,41 @@ wants, the distance it serves.
 ## Images
 
 The admin checks that a file is an image but not its size or type, so follow these rules. Every picture is downloaded by a
-customer's phone, and the free server's traffic is limited, so small files matter.
+customer's phone, often over mobile data, and a chat opens all the menu images of a restaurant, so small files make the
+chat open fast. The pictures are served from the media bucket, not from the API server.
+
+Prepare every picture with **Squoosh** (see [Preparing a picture with Squoosh](#preparing-a-picture-with-squoosh)).
+
+1,600 px is a maximum, not a target. A picture that is already smaller is **not enlarged** (that only makes it blurry): convert it to JPEG or WebP and compress it to 300 KB or less. If the text is hard to read when you zoom in, or the long side is under about 1,000 px, take or scan the menu again at a higher resolution. A very tall picture (for example 1,000 × 3,000 px) would shrink to an unreadable width at 1,600 px, so cut it into several pictures, one per section, each about 1,200 × 1,600 px, and number them with the sort order.
 
 | Image | Where it is used | Format | Size | Weight | Notes |
 | --- | --- | --- | --- | --- | --- |
 | **Logo** | map list, chat avatar, restaurant page | PNG (WebP is also fine), never SVG | **512 × 512 px**, square | under about 100 KB | Keep the artwork centred with a margin: it is shown in a circle. A transparent or plain background is fine. At least 256 × 256 px |
-| **Menu images** | sent in the chat; the customer opens them full width and pinches to zoom | JPEG or WebP | up to **1,600 px on the long side** | **300 KB or less** each | One image per menu page or section, in the order you want (sort order). Shoot flat and straight in good light so the text is readable zoomed. Convert iPhone HEIC photos to JPEG |
+| **Menu images** | sent in the chat; the customer opens them full width and pinches to zoom | JPEG or WebP | **1,600 px on the long side at most**, and **about 1,000 px at least** | **300 KB or less** each | One image per menu page or section, in the order you want (sort order). Shoot flat and straight in good light so the text is readable zoomed. Convert iPhone HEIC photos to JPEG. A smaller picture is kept at its size, never enlarged |
 | **Item photo** (optional) | the item picker | JPEG or WebP | **800 × 800 px**, square | under about 100 KB | Skip it when there is no good photo |
 | **Cover** | not used by the API yet | | | | Leave it empty |
 
-Compress before uploading (any image tool will do), then open the restaurant page in the admin: the preview shows what was
-stored.
+### Preparing a picture with Squoosh
+
+The standard tool is **Squoosh** ([squoosh.app](https://squoosh.app)), a free tool that runs in the browser. Open it, drop
+the file on the page, and use the panel on the right. **Resize is off by default**, so a picture keeps its original,
+often huge, size until you turn it on.
+
+| Picture | Resize (turn it on, keep the aspect ratio) | Compress | Target |
+| --- | --- | --- | --- |
+| **Menu image** | long side **1,600 px** (leave it as it is when it is smaller; never enlarge) | **MozJPEG**, quality **80** | 300 KB or less |
+| **Item photo** | **800 × 800 px** | **MozJPEG**, quality **75** | about 100 KB or less |
+| **Logo** | **512 × 512 px** | **OxiPNG** (lossless PNG) | about 100 KB or less |
+
+1. Choose the settings above, then read the size under the right-hand image (for example "200 kB").
+2. Over the target: lower the quality in steps of 5 (not below about 65 for a menu with text), or reduce the long side of a
+   menu image to 1,400 px.
+3. Drag the black bar across the preview and zoom in on the text and the edges: it must stay readable and clean.
+4. Click the blue download button and give the file a clear name (`gulf-food-menu-1.jpg`, `gulf-food-logo.png`).
+
+Squoosh shows a message such as "No image found in the clipboard" when it opens: ignore it. WebP is also accepted and is a
+little smaller than JPEG at the same quality, but JPEG works everywhere. Then open the restaurant page in the admin: the
+preview shows what was stored.
 
 ## Staff accounts
 

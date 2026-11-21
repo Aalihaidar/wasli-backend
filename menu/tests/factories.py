@@ -4,9 +4,18 @@ from menu.models import MenuCategory, MenuItem, Option, OptionGroup
 from restaurants.models import Restaurant
 
 
-def make_category(restaurant: Restaurant, name: str = "Drinks") -> MenuCategory:
+def make_category(
+    restaurant: Restaurant,
+    name: str = "Drinks",
+    parent: MenuCategory | None = None,
+    **extra: object,
+) -> MenuCategory:
     return MenuCategory.objects.create(
-        restaurant=restaurant, name_en=name, name_ar="مشروبات"
+        restaurant=restaurant,
+        name_en=name,
+        name_ar="مشروبات",
+        parent=parent,
+        **extra,
     )
 
 
