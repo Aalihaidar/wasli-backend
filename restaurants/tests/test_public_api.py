@@ -469,3 +469,61 @@ class TestEnglishOnlyRestaurant:
         entry = body["menu"][0]["items"][0]
         assert entry["name_ar"] == "شاي"
         assert entry["description_ar"] == "قوي"
+
+
+class TestNestedMenu:
+    """Categories may sit inside categories (up to three levels). The list stays flat, depth
+    first, and a subcategory carries the id of its parent."""
+
+    def url(self, slug: str) -> str:
+        return f"/api/v1/restaurants/{slug}"
+
+    def test_the_menu_is_flat_depth_first_with_the_parent_id_on_subcategories(
+        self, api: APIClient
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        drinks = make_category(restaurant, "Drinks", sort_order=2)
+        burgers = make_category(restaurant, "Burgers", sort_order=1)
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        chicken = make_category(restaurant, "Chicken", parent=grilled)
+        make_item(burgers, "House burger", 1500)
+        make_item(chicken, "Chicken burger", 1800)
+
+        body = api.get(self.url("cafe-a")).json()
+
+        assert [c["name_en"] for c in body["menu"]] == [
+            "Burgers",
+            "Grilled",
+            "Chicken",
+            "Drinks",
+        ]
+        by_name = {c["name_en"]: c for c in body["menu"]}
+        assert "parent_id" not in by_name["Burgers"]
+        assert "parent_id" not in by_name["Drinks"]
+        assert by_name["Grilled"]["parent_id"] == str(burgers.pk)
+        assert by_name["Chicken"]["parent_id"] == str(grilled.pk)
+        assert [i["name_en"] for i in by_name["Burgers"]["items"]] == ["House burger"]
+        assert [i["name_en"] for i in by_name["Chicken"]["items"]] == ["Chicken burger"]
+        assert by_name["Drinks"]["items"] == []
+        assert str(drinks.pk) == by_name["Drinks"]["id"]
+
+    def test_hiding_a_category_hides_its_subcategories_and_their_items(
+        self, api: APIClient
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        burgers = make_category(restaurant, "Burgers", is_active=False)
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        make_item(grilled, "Hidden burger")
+        make_category(restaurant, "Drinks")
+
+        body = api.get(self.url("cafe-a")).json()
+
+        assert [c["name_en"] for c in body["menu"]] == ["Drinks"]
+
+    def test_a_menu_without_subcategories_is_unchanged(self, api: APIClient) -> None:
+        restaurant = make_restaurant("cafe-a")
+        make_item(make_category(restaurant, "Drinks"), "Karak tea")
+
+        [category] = api.get(self.url("cafe-a")).json()["menu"]
+
+        assert set(category) == {"id", "name_en", "name_ar", "items"}

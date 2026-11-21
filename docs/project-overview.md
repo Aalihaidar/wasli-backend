@@ -191,6 +191,7 @@ erDiagram
     CUSTOMER ||--o{ VEHICLE : owns
     RESTAURANT ||--o{ MENU_IMAGE : shows
     RESTAURANT ||--o{ MENU_CATEGORY : has
+    MENU_CATEGORY ||--o{ MENU_CATEGORY : "has subcategories (up to 3 levels)"
     MENU_CATEGORY ||--o{ MENU_ITEM : contains
     MENU_ITEM ||--o{ OPTION_GROUP : has
     OPTION_GROUP ||--o{ OPTION : has

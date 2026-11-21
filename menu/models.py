@@ -9,6 +9,8 @@ from core.tenancy import RestaurantOwnedModel, align_with_parent
 
 MAX_ALIASES = 20
 MAX_ALIAS_LENGTH = 60
+# A menu has up to three levels: a category, its subcategories and their subcategories.
+MAX_CATEGORY_DEPTH = 3
 
 
 def clean_aliases(value: object) -> list[str]:
@@ -38,6 +40,20 @@ def clean_aliases(value: object) -> list[str]:
 
 
 class MenuCategory(ArabicFallbackMixin, RestaurantOwnedModel):
+    """A heading of the menu. A category may sit inside another one (a subcategory), up to
+    ``MAX_CATEGORY_DEPTH`` levels, and holds items at any level."""
+
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="children",
+        help_text=(
+            "Optional. Choose a category to make this one its subcategory. A menu has "
+            "up to three levels: category, subcategory and sub-subcategory."
+        ),
+    )
     name_en = models.CharField(max_length=150)
     name_ar = models.CharField(
         max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
@@ -48,9 +64,81 @@ class MenuCategory(ArabicFallbackMixin, RestaurantOwnedModel):
     class Meta:
         ordering = ("sort_order", "name_en")
         verbose_name_plural = "menu categories"
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.CheckConstraint(
+                condition=~models.Q(parent=models.F("id")),
+                name="menu_category_not_its_own_parent",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.restaurant}: {self.name_en}"
+        return f"{self.restaurant}: {self.path}"
+
+    def _chain(self) -> list[MenuCategory]:
+        """This category and its parents, from itself up to the top. It stops after
+        ``MAX_CATEGORY_DEPTH + 1`` steps and at a repeat, so a bad loop can never run on."""
+        chain: list[MenuCategory] = [self]
+        node = self.parent
+        while node is not None and len(chain) <= MAX_CATEGORY_DEPTH:
+            if any(node.pk == seen.pk for seen in chain):
+                break
+            chain.append(node)
+            node = node.parent
+        return chain
+
+    @property
+    def depth(self) -> int:
+        """1 for a top-level category, 2 for a subcategory, 3 for a sub-subcategory."""
+        return len(self._chain())
+
+    @property
+    def path(self) -> str:
+        """The names from the top category down to this one: ``Burgers > Grilled``."""
+        return " > ".join(c.name_en for c in reversed(self._chain()))
+
+    def _subtree_height(self) -> int:
+        """1 for a category with no subcategory, 2 when it has subcategories, and so on."""
+        if self._state.adding:
+            return 1
+        height, level = 1, [self.pk]
+        while level and height <= MAX_CATEGORY_DEPTH:
+            level = list(
+                MenuCategory.objects.filter(parent_id__in=level).values_list(
+                    "pk", flat=True
+                )
+            )
+            if level:
+                height += 1
+        return height
+
+    def clean(self) -> None:
+        super().clean()
+        self._normalise()
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        self._normalise()
+        super().save(*args, **kwargs)
+
+    def _normalise(self) -> None:
+        parent = self.parent
+        if parent is None:
+            return
+        align_with_parent(self, parent, "parent")
+        parents = parent._chain()
+        if not self._state.adding and any(self.pk == c.pk for c in parents):
+            raise ValidationError(
+                {
+                    "parent": "A category cannot be inside itself or inside one of its "
+                    "own subcategories."
+                }
+            )
+        if len(parents) + self._subtree_height() > MAX_CATEGORY_DEPTH:
+            raise ValidationError(
+                {
+                    "parent": "A menu has at most three levels: category, subcategory "
+                    "and sub-subcategory."
+                }
+            )
 
 
 class MenuItem(ArabicFallbackMixin, RestaurantOwnedModel):

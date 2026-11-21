@@ -1,14 +1,14 @@
 from typing import Any
 
 from django.conf import settings
-from django.db.models import Prefetch
+from django.db.models import Prefetch, prefetch_related_objects
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.views import PublicAPIView
-from menu.models import MenuCategory
+from menu.services import visible_categories
 from restaurants.models import RestaurantMenuImage
 
 from .serializers import (
@@ -76,16 +76,13 @@ class RestaurantDetailView(PublicAPIView):
                     queryset=RestaurantMenuImage.objects.all(),
                     to_attr="menu_images",
                 ),
-                Prefetch(
-                    "menu_menucategory_set",
-                    queryset=MenuCategory.objects.filter(
-                        is_active=True
-                    ).prefetch_related("items__option_groups__options"),
-                    to_attr="menu",
-                ),
             ),
             slug=slug,
         )
+        # The categories a customer sees (active, with every parent active), depth first.
+        categories = visible_categories(restaurant)
+        prefetch_related_objects(categories, "items__option_groups__options")
+        restaurant.menu = categories  # type: ignore[attr-defined]
         return Response(
             RestaurantDetailSerializer(restaurant, context={"request": request}).data
         )

@@ -2,6 +2,7 @@ from typing import Any, ClassVar
 
 from django import forms
 from django.contrib import admin
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils.safestring import SafeString
 
@@ -36,12 +37,46 @@ class MenuItemInline(admin.TabularInline):  # type: ignore[type-arg]
 
 @admin.register(MenuCategory)
 class MenuCategoryAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
-    list_display = ("name_en", "name_ar", "restaurant", "sort_order", "is_active")
+    list_display = (
+        "path_display",
+        "name_ar",
+        "restaurant",
+        "sort_order",
+        "is_active",
+    )
     list_filter = ("restaurant", "is_active")
     search_fields = ("name_en", "name_ar")
+    fields = (
+        "restaurant",
+        "parent",
+        "name_en",
+        "name_ar",
+        "sort_order",
+        "is_active",
+    )
     inlines: ClassVar[list[type[admin.options.InlineModelAdmin]]] = [  # type: ignore[type-arg]
         MenuItemInline
     ]
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[MenuCategory]:
+        return (
+            super().get_queryset(request).select_related("restaurant", "parent__parent")
+        )
+
+    def formfield_for_foreignkey(
+        self, db_field: Any, request: HttpRequest, **kwargs: Any
+    ) -> Any:
+        if db_field.name == "parent":
+            # Only a top-level category or a subcategory can have subcategories: a menu has
+            # three levels at most. The model checks the rest (same restaurant, no loop).
+            kwargs["queryset"] = MenuCategory.objects.filter(
+                parent__parent__isnull=True
+            ).select_related("restaurant", "parent__parent")
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    @admin.display(description="Category", ordering="name_en")
+    def path_display(self, obj: MenuCategory) -> str:
+        return obj.path
 
 
 class OptionGroupInline(admin.TabularInline):  # type: ignore[type-arg]

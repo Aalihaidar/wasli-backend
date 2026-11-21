@@ -32,15 +32,23 @@ def arabic_text(source: str) -> serializers.CharField:
     )
 
 
-class OptionalIntegerField(serializers.IntegerField):  # type: ignore[misc]
-    """An integer that is left out of the response, never ``null``, when it has no value: the
+class _OmitWhenNone:
+    """Leaves the property out of the response, never ``null``, when it has no value: the
     contract has no nullable references and a missing value is an optional property."""
 
     def get_attribute(self, instance: object) -> object:
-        value = super().get_attribute(instance)
+        value = super().get_attribute(instance)  # type: ignore[misc]
         if value is None:
             raise serializers.SkipField()
         return value
+
+
+class OptionalIntegerField(_OmitWhenNone, serializers.IntegerField):  # type: ignore[misc]
+    """An integer that is left out of the response when it has no value."""
+
+
+class OptionalUUIDField(_OmitWhenNone, serializers.UUIDField):  # type: ignore[misc]
+    """An id that is left out of the response when it has no value."""
 
 
 SERVICE_RADIUS_HELP = "Metres from the restaurant that it serves cars. Absent when the restaurant sets no limit."
@@ -152,12 +160,19 @@ class MenuItemSerializer(serializers.ModelSerializer):  # type: ignore[misc]
 
 
 class MenuCategorySerializer(serializers.ModelSerializer):  # type: ignore[misc]
+    parent_id = OptionalUUIDField(
+        required=False,
+        help_text=(
+            "The id of the category this one is inside (a subcategory). Absent for a "
+            "top-level category."
+        ),
+    )
     name_ar = arabic_name()
     items = MenuItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = MenuCategory
-        fields = ("id", "name_en", "name_ar", "items")
+        fields = ("id", "parent_id", "name_en", "name_ar", "items")
         read_only_fields = fields
 
 
@@ -171,7 +186,16 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):  # type: ignore[m
         required=False, help_text=SERVICE_RADIUS_HELP
     )
     menu_images = MenuImageSerializer(many=True, read_only=True)
-    menu = MenuCategorySerializer(many=True, read_only=True)
+    menu = MenuCategorySerializer(
+        many=True,
+        read_only=True,
+        help_text=(
+            "The categories a customer sees, depth first: a category is followed by its "
+            "subcategories (the ones whose `parent_id` is its id), and each level is in "
+            "display order. A menu has up to three levels. A hidden category hides "
+            "everything inside it."
+        ),
+    )
 
     class Meta:
         model = Restaurant
