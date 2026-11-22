@@ -26,6 +26,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0015](0015-service-distance-replaces-the-parking-lot.md) | A restaurant's service distance replaces the parking lot (changes the range rule of 0008) | accepted, built |
 | [0016](0016-nested-menu-categories.md) | Menu categories can nest, up to three levels (category, subcategory, sub-subcategory) | accepted, built |
 | [0017](0017-order-type-and-the-phone-check.md) | The order type on conversations and orders, and the phone check before the first order (a setting, off on staging until the pilot) | accepted, model and gate built |
+| [0018](0018-placing-an-order.md) | How an order is priced and placed: what the server checks, the order of the steps, and what never refuses an order | accepted, built |
 
 ## Writing a record
 
