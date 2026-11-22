@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from core.geo import LOCATION_SOURCE_CHOICES, LocationSource
 from core.locales import LOCALE_CHOICES, Locale
+from core.order_types import OrderType
 from core.tenancy import RestaurantOwnedModel, align_with_parent
 
 # A conversation that has not reached ``placed`` expires this long after the customer's last
@@ -73,6 +74,10 @@ class Conversation(RestaurantOwnedModel):
     # The language the bot writes in; the customer can switch it in the chat.
     locale = models.CharField(
         max_length=2, choices=LOCALE_CHOICES, default=Locale.EN.value
+    )
+    # How the order will be served. Only ``car`` is accepted for now; the order copies it.
+    order_type = models.CharField(
+        max_length=10, choices=OrderType, default=OrderType.CAR
     )
     # A list of ``{line, item_id, quantity, option_ids, note}``; the server prices it.
     lines = models.JSONField(default=list, blank=True)

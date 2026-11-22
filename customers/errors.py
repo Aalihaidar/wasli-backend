@@ -46,6 +46,14 @@ class AccountNotVerified(_Coded):
     default_detail = "Verify the code sent to your contact before signing in."
 
 
+class PhoneNotVerified(_Coded):
+    """The final confirmation of a first order from a customer whose phone is not verified."""
+
+    status_code = status.HTTP_403_FORBIDDEN
+    default_code = "phone_not_verified"
+    default_detail = "Verify your phone number before you place your first order."
+
+
 class AccountExists(_Coded):
     status_code = status.HTTP_409_CONFLICT
     default_code = "account_exists"

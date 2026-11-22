@@ -83,7 +83,7 @@ class OrderAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         "customer",
         "conversation",
         "status",
-        "fulfilment_type",
+        "order_type",
         "subtotal_minor",
         "total_minor",
         "currency",

@@ -1,11 +1,14 @@
 from datetime import timedelta
+from typing import Any
 
 import pytest
 from django.utils import timezone
 
+from customers.errors import PhoneNotVerified
 from customers.models import Customer, CustomerSession
 from customers.services import (
     TOUCH_INTERVAL,
+    ensure_phone_verified_for_order,
     generate_token,
     get_active_session,
     hash_token,
@@ -120,3 +123,38 @@ def test_last_seen_is_refreshed_only_after_the_interval() -> None:
     assert session.last_seen_at > old
     customer = Customer.objects.get(pk=customer.pk)
     assert customer.last_seen_at is not None
+
+
+class TestPhoneGate:
+    def test_it_is_off_by_default(self, settings: Any) -> None:
+        assert settings.REQUIRE_VERIFIED_PHONE is False
+
+        ensure_phone_verified_for_order(make_customer())
+
+    def test_an_unverified_phone_is_refused_when_it_is_on(self, settings: Any) -> None:
+        settings.REQUIRE_VERIFIED_PHONE = True
+
+        with pytest.raises(PhoneNotVerified) as refused:
+            ensure_phone_verified_for_order(make_customer())
+
+        assert refused.value.status_code == 403
+        assert refused.value.get_codes() == "phone_not_verified"
+
+    def test_a_verified_phone_passes_when_it_is_on(self, settings: Any) -> None:
+        settings.REQUIRE_VERIFIED_PHONE = True
+        customer = make_customer()
+        customer.user.phone = "+971501234567"
+        customer.user.phone_verified_at = timezone.now()
+        customer.user.save()
+
+        ensure_phone_verified_for_order(customer)
+
+    def test_a_refusal_changes_nothing(self, settings: Any) -> None:
+        settings.REQUIRE_VERIFIED_PHONE = True
+        customer = make_customer()
+
+        with pytest.raises(PhoneNotVerified):
+            ensure_phone_verified_for_order(customer)
+
+        customer.user.refresh_from_db()
+        assert customer.user.phone_verified_at is None

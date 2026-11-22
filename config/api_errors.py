@@ -55,6 +55,7 @@ class ErrorCode403Enum(models.TextChoices):
 
     PERMISSION_DENIED = "permission_denied"
     ACCOUNT_NOT_VERIFIED = "account_not_verified"
+    PHONE_NOT_VERIFIED = "phone_not_verified"
 
 
 class Error403Serializer(serializers.Serializer):  # type: ignore[misc]
