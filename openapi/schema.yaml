@@ -1118,9 +1118,11 @@ components:
       description: |-
         * `permission_denied` - Permission Denied
         * `account_not_verified` - Account Not Verified
+        * `phone_not_verified` - Phone Not Verified
       x-extensible-enum:
       - permission_denied
       - account_not_verified
+      - phone_not_verified
     ErrorCode404Enum:
       type: string
       description: '* `not_found` - Not Found'

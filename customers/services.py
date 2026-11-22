@@ -2,8 +2,10 @@ import hashlib
 import secrets
 from datetime import timedelta
 
+from django.conf import settings
 from django.utils import timezone
 
+from .errors import PhoneNotVerified
 from .models import Customer, CustomerSession
 
 # A session's "last seen" is refreshed at most this often, so a busy client (polling every
@@ -68,3 +70,12 @@ def touch_session(session: CustomerSession) -> None:
     Customer.objects.filter(pk=session.customer_id).update(
         last_seen_at=now, updated_at=now
     )
+
+
+def ensure_phone_verified_for_order(customer: Customer) -> None:
+    """Refuse the final confirmation of an order when the phone check is on and the customer's
+    phone is not verified. It changes nothing and stores nothing, so the same request goes
+    through once the customer has verified a phone (``POST /customers/me/contact`` and
+    ``/me/contact/verify``). Off by default: ``REQUIRE_VERIFIED_PHONE`` comes on with the pilot."""
+    if settings.REQUIRE_VERIFIED_PHONE and customer.user.phone_verified_at is None:
+        raise PhoneNotVerified

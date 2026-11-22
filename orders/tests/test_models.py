@@ -30,7 +30,7 @@ class TestOrder:
 
         assert order.pk.version == 4
         assert order.status == OrderStatus.PLACED
-        assert order.fulfilment_type == "car"
+        assert order.order_type == "car"
         assert order.currency == "AED"
         assert order.customer_lat is None
         assert order.location_source == "none"

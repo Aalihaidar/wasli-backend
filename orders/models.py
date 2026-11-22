@@ -12,6 +12,7 @@ from core.geo import (
     distance_band,
 )
 from core.money import CURRENCY
+from core.order_types import OrderType
 from core.tenancy import RestaurantOwnedModel, align_with_parent
 
 # The wait times a restaurant can promise when it accepts an order.
@@ -47,10 +48,6 @@ class RejectionReason(models.TextChoices):
     OTHER = "other", "Other"
 
 
-class FulfilmentType(models.TextChoices):
-    CAR = "car", "To the car"
-
-
 class PaymentMethod(models.TextChoices):
     CASH = "cash", "Cash"
     CARD = "card", "Card"
@@ -83,8 +80,9 @@ class Order(RestaurantOwnedModel):
     status = models.CharField(
         max_length=15, choices=OrderStatus, default=OrderStatus.PLACED
     )
-    fulfilment_type = models.CharField(
-        max_length=10, choices=FulfilmentType, default=FulfilmentType.CAR
+    # Copied from the conversation. Only ``car`` is accepted for now.
+    order_type = models.CharField(
+        max_length=10, choices=OrderType, default=OrderType.CAR
     )
     subtotal_minor = models.PositiveIntegerField(
         help_text="In fils: 1250 is 12.50 AED."

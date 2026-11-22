@@ -150,8 +150,25 @@ The sections below take the project from the finished scaffold to the complete f
 
 ## 11. D2: the conversation engine
 
+**First end-to-end test (owner, 2026-11-21).** The next goal is to connect the customer app to the backend and test the
+whole customer flow on staging before the restaurant side exists: the customer opens the app, sees the nearest restaurant
+(Gulf Food), gets the welcome and the menu, sends an order by text or by voice, edits or confirms the replies, answers the
+one car and parking question and the note question, the app sends the phone's current position, and the final review
+confirms the order. Voice is processed in memory and never saved (only the transcript stays on the message). A placed order
+shows in the Django admin (read-only) until the restaurant app comes in D3 (accept and reject). Built in slices, each its
+own pull request, and after each one the frontend is told the commit to pin:
+
+1. Contract and model: `order_type`, the phone check behind a setting, `phone_not_verified` (ADR 0017).
+2. The order service: validation, pricing and order creation, with tests and no endpoints.
+3. Text chat: create or get a conversation (welcome and menu images), send a message, read messages, the order summary with
+   Confirm and Edit. Needs the Gemini key from here on (`docs/gemini-setup.md`, written when this slice starts).
+4. Voice: the upload endpoint, its limits and the transcript on the customer's message.
+5. Car and position: the car question, the note, `PUT /conversations/{id}/location`, the final review and the placed order.
+6. The fallbacks without the assistant (item picker, one car question at a time) and the budget guard.
+
 - [x] `assistant`: fake adapter with recorded outputs (used by every test), prompts and call logging (one `AICallLog` row per call, never the content)
 - [ ] `assistant`: the availability flag (`ai_available` false for 5 minutes after a provider failure)
+- [x] `order_type` (`car`, `dine_in`, `delivery`; default `car`) on `Conversation` and `Order` (the order's `fulfilment_type` was renamed), the setting `REQUIRE_VERIFIED_PHONE` (false in the code; on for the staging pilot and in production, owner 2026-11-22), the `403 phone_not_verified` error and `customers.services.ensure_phone_verified_for_order`, with tests and the extended error list in the schema ([ADR 0017](adr/0017-order-type-and-the-phone-check.md)); the `unsupported_order_type` check and the request field come with the conversation endpoint
 - [ ] `orders/services.py`: validation and pricing from the database (availability, option rules, default options, limits of 20 lines and quantity 20), unit-tested
 - [ ] `chat/texts.py`: every bot text in Arabic and English, with a test that each text has both
 - [ ] `chat/engine.py`: welcome, menu images and first question, then the ordering loop (item actions applied, ids validated, unmatched items, choice questions and `choose`, empty order, cancel and `restart`)
@@ -190,7 +207,9 @@ The sections below take the project from the finished scaffold to the complete f
 - [ ] Restaurant-admin API, each endpoint checking its permission code: menu and prices (items, options, photos, availability), members (add, edit, change role, deactivate and reactivate, reset password with a temporary password; no hard delete), restaurant settings, reports
 - [ ] Guardrails tested: an admin manages only their own restaurant, cannot grant more than their own role, cannot deactivate or demote the last admin; a deactivated member keeps their history and can be reactivated; a new member must change the temporary password
 - [x] Decide with the owner whether a customer who signed up with an email must also verify a phone number before the first order (decided 2026-11-12: it must, at the pilot)
-- [ ] Phone check before the first order: agree the refusal status and error code in an API request issue, then build the gate in the order service (it reuses `POST /customers/me/contact` and `POST /customers/me/contact/verify`) with tests
+- [x] Phone check before the first order: the refusal (`403 phone_not_verified`), the setting `REQUIRE_VERIFIED_PHONE` and the gate function are built in D2 (agreed in issue #52, [ADR 0017](adr/0017-order-type-and-the-phone-check.md)); the order service calls the gate at the final confirmation
+- [ ] **Needs the owner:** set `REQUIRE_VERIFIED_PHONE=true` on the staging Render service (owner decision 2026-11-22), redeploy, and check that an email-only customer is stopped at the final confirmation and can place the order after verifying a phone with a code read in the admin outbox (the check runs once the order service calls the gate)
+- [ ] Production: `REQUIRE_VERIFIED_PHONE=true` and a real SMS backend before the first real customer
 - [ ] Audit log of price, menu and member changes (who, what, when)
 - [ ] Two-factor sign-in for the platform team
 - [ ] Per-device staff tokens, so signing out on one device does not sign out the others

@@ -140,7 +140,7 @@ Decisions specific to this project, on top of the defaults above.
 
 ### Errors
 
-- The error codes a client acts on are stable: `order_invalid_transition`, `item_unavailable`, `invalid_location`, `ai_unavailable`, `transcription_failed`, `conversation_expired`, `invalid_action_for_state`, `audio_too_long`, and for customer accounts `account_exists`, `code_invalid`, `code_expired`, `too_many_attempts`, `account_not_verified`.
+- The error codes a client acts on are stable: `order_invalid_transition`, `item_unavailable`, `invalid_location`, `ai_unavailable`, `transcription_failed`, `conversation_expired`, `invalid_action_for_state`, `audio_too_long`, and for customer accounts `account_exists`, `code_invalid`, `code_expired`, `too_many_attempts`, `account_not_verified`, and for the first order `phone_not_verified` (`403`, [ADR 0017](adr/0017-order-type-and-the-phone-check.md)).
 - A missing or invalid answer inside the chat (for example a car colour) is not an HTTP error: the server asks the question again in the conversation.
 
 ### Location

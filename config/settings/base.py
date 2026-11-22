@@ -164,6 +164,11 @@ ENVIRONMENT = env_choice("ENVIRONMENT", "local", {"local", "staging", "productio
 # How an order's location is checked against the restaurant: "off", "warn" (record it,
 # never block) or "enforce" (refuse a clearly-outside order).
 LOCATION_CHECK = env_choice("LOCATION_CHECK", "warn", {"off", "warn", "enforce"})
+# True: a customer must have a verified phone number before the first order, and the final
+# confirmation of one without it is refused with 403 ``phone_not_verified`` (decided
+# 2026-11-12, ADR 0017). Off by default so local development and the tests need no code;
+# on for the staging pilot (Render variable, owner 2026-11-22) and in production.
+REQUIRE_VERIFIED_PHONE = env_bool("REQUIRE_VERIFIED_PHONE", default=False)
 # How outgoing email and SMS leave the system (messaging/backends.py). "outbox" stores them
 # in the database for the owner to read in the admin; it refuses to run in production.
 # "disabled" sends nothing and refuses every send: production uses it until a real backend
