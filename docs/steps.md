@@ -162,7 +162,7 @@ own pull request, and after each one the frontend is told the commit to pin:
 2. The order service: validation, pricing and order creation, with tests and no endpoints.
 3. Text chat: create or get a conversation (welcome and menu images), send a message, read messages, the order summary with
    Confirm and Edit. Needs the Gemini key from here on (the owner's steps are in `docs/gemini-setup.md`). Built ([ADR 0019](adr/0019-the-conversation-engine.md)): the endpoints `POST /restaurants/{slug}/conversations`, `GET` and `POST /conversations/{id}/messages`, and the engine up to the order summary and Confirm.
-4. Voice: the upload endpoint, its limits and the transcript on the customer's message.
+4. Voice: the upload endpoint, its limits and the transcript on the customer's message. Built in the ordering step ([ADR 0021](adr/0021-voice-is-read-in-memory-and-never-stored.md)); the voice paths of the car answer and the note come with their step.
 5. Car and position: the car question, the note, `PUT /conversations/{id}/location`, the final review and the placed order.
 6. The fallbacks without the assistant (item picker, one car question at a time) and the budget guard.
 
@@ -177,8 +177,9 @@ own pull request, and after each one the frontend is told the commit to pin:
 - [ ] Engine: the car question (one question, merge-only answers, server validation, ask only for what is missing), the note question and skip, the review with the three edit paths and the return to the review, `set_locale`
 - [x] Engine: duplicate `client_message_id` returns the earlier result, conversation expiry (60 minutes after the customer's last message); one order per conversation is enforced by the order service
 - [x] `orders/services.py` `place_order`: order creation in one transaction (the phone check first, then the conversation and the restaurant row locked, everything priced and checked again, the next number, copies of the lines, the car, the note and the position, the distance to the restaurant, the `enforce` location rule, an event, the car saved for next time, the conversation placed), unit-tested; the bot message is added by the engine in the same transaction ([ADR 0018](adr/0018-placing-an-order.md))
-- [ ] Voice paths (audio into the car answer and the note, transcript stored, empty transcript repeats the question, size and length limits) and the fallbacks (car details one at a time, `set_lines`, assistant unavailable)
-- [ ] Endpoints: create or get a conversation, messages (text and actions) and messages after a sequence number are built with the customer-scoping tests (another customer's conversation is a 404); still to build: voice, location and `GET /orders/{id}`
+- [x] Voice in the ordering step: `POST /conversations/{id}/voice` (multipart `client_message_id` and one WAV `audio`, at most 30 seconds and 5 MB, checked on the file itself), read in memory and never stored, understood like a typed message, the transcript kept on the customer's message, an empty transcript (Whisper's segments marked as not speech are dropped, so silence is empty) or a clip the provider cannot read asked again in the chat, an outage or a used-up budget answered in the chat, `audio_too_long`, `audio_too_large` and `unsupported_audio_format` as `400`, tested with real WAV bytes and a fake assistant
+- [ ] Voice paths of the car answer and the note, and the fallbacks (car details one at a time, assistant unavailable; `set_lines` and the typed-order fallback are built)
+- [ ] Endpoints: create or get a conversation, messages (text and actions) and messages after a sequence number and voice are built with the customer-scoping tests (another customer's conversation is a 404); still to build: location and `GET /orders/{id}`
 - [ ] Engine, pricing, parsing, voice, fallback, session and location tests pass; API smoke test from nearby to a placed order
 - [ ] Regenerate and commit `openapi/schema.yaml`, publish release `v0.2.0` and tell the frontend team
 - [ ] **D2 done:** on the deployed API a customer goes from the welcome to a placed order by text and by voice, with edits at both confirmations

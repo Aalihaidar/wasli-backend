@@ -13,4 +13,9 @@ urlpatterns = [
         views.ConversationMessagesView.as_view(),
         name="conversations-messages",
     ),
+    path(
+        "conversations/<uuid:id>/voice",
+        views.ConversationVoiceView.as_view(),
+        name="conversations-voice",
+    ),
 ]

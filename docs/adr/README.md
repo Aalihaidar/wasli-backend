@@ -29,6 +29,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0018](0018-placing-an-order.md) | How an order is priced and placed: what the server checks, the order of the steps, and what never refuses an order | accepted, built |
 | [0019](0019-the-conversation-engine.md) | How the conversation engine runs a turn: one transaction per input, replays, the assistant proposes and the server decides, errors only for state | accepted, ordering step built |
 | [0020](0020-groq-is-the-main-assistant-provider.md) | Groq is the main assistant provider (Whisper and a text model, numbered keys used in order), Gemini the second; how limits are counted | accepted, built |
+| [0021](0021-voice-is-read-in-memory-and-never-stored.md) | A voice clip is read in memory and never stored: the voice endpoint, WAV only for now, and what happens when it cannot be understood | accepted, built |
 
 ## Writing a record
 

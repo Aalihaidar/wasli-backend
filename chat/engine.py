@@ -30,7 +30,9 @@ from assistant.models import Outcome
 from assistant.services import Assistant
 from assistant.types import (
     ActionType,
+    AudioInput,
     CurrentLine,
+    MessageInput,
     OrderAction,
     OrderIntent,
     ParseOrderResult,
@@ -63,6 +65,9 @@ from .texts import pick, say
 # A provider failure of these kinds turns the assistant off for a few minutes. A badly formed
 # answer (``invalid_output``) does not: the provider is up, it just did not understand.
 _OUTAGE = {Outcome.ERROR, Outcome.TIMEOUT, Outcome.RATE_LIMITED}
+# What a provider answers when it cannot read the clip itself (a corrupt or unsupported file):
+# the clip is the problem, so the customer is asked to say it again and the assistant stays on.
+_UNREADABLE_AUDIO = {"http_400", "http_413", "http_415", "http_422"}
 # What the bot quotes of a thing the customer asked for that is not on the menu.
 _UNMATCHED_SHOWN = 3
 _UNMATCHED_CHARS = 60
@@ -321,6 +326,9 @@ class _Turn:
         self.restaurant = conversation.restaurant
         self.assistant = assistant
         self.menu = _Menu(self.restaurant)
+        # The customer's message of this turn, once it is stored (a voice turn adds its
+        # transcript to it).
+        self.customer_row: Message | None = None
 
     @property
     def locale(self) -> str:
@@ -445,11 +453,8 @@ class _Turn:
 
     # -- text ---------------------------------------------------------------------------------
 
-    def on_text(self, text: str) -> list[Reply]:
-        conversation = self.conversation
-        if not ai_available():
-            return [self.reply("assistant_down")]
-        current = [
+    def _current_lines(self) -> list[CurrentLine]:
+        return [
             CurrentLine(
                 line=line["line"],
                 item_id=line["item_id"],
@@ -457,26 +462,57 @@ class _Turn:
                 option_ids=tuple(line["option_ids"]),
                 note=line.get("note") or "",
             )
-            for line in conversation.lines
+            for line in self.conversation.lines
         ]
+
+    def _ask_assistant(self, message: MessageInput) -> ParseOrderResult:
+        conversation = self.conversation
+        return self.assistant.parse_order(
+            self.menu.prompt,
+            self._current_lines(),
+            conversation.pending_question,
+            message,
+            self.locale,
+            restaurant=self.restaurant,
+            conversation=conversation,
+        )
+
+    def _failed(self, error: AssistantError, unavailable: str) -> Reply:
+        """The bot's answer when the assistant could not be used for this input."""
+        if error.outcome in _OUTAGE:
+            record_failure()
+            return self.reply(unavailable)
+        if error.outcome == Outcome.BUDGET_EXCEEDED:
+            # Nothing was sent: the day's budget is used up, so the picker is offered.
+            return self.reply(unavailable)
+        return self.reply("not_understood")
+
+    def on_text(self, text: str) -> list[Reply]:
+        if not ai_available():
+            return [self.reply("assistant_down")]
         try:
-            result = self.assistant.parse_order(
-                self.menu.prompt,
-                current,
-                conversation.pending_question,
-                text,
-                self.locale,
-                restaurant=self.restaurant,
-                conversation=conversation,
-            )
+            result = self._ask_assistant(text)
         except AssistantError as error:
-            if error.outcome in _OUTAGE:
-                record_failure()
-                return [self.reply("assistant_down")]
-            if error.outcome == Outcome.BUDGET_EXCEEDED:
-                # Nothing was sent: the day's budget is used up, so the picker is offered.
-                return [self.reply("assistant_down")]
-            return [self.reply("not_understood")]
+            return [self._failed(error, "assistant_down")]
+        return self.on_parsed(result)
+
+    def on_voice(self, audio: AudioInput) -> list[Reply]:
+        """A spoken message goes to the assistant like a typed one, and what it heard is kept
+        on the customer's message as the transcript. The clip itself is dropped with this call."""
+        if not ai_available():
+            return [self.reply("voice_unavailable")]
+        try:
+            result = self._ask_assistant(audio)
+        except AssistantError as error:
+            if error.code in _UNREADABLE_AUDIO:
+                return [self.reply("could_not_hear")]
+            return [self._failed(error, "voice_unavailable")]
+        heard = (result.transcript or "").strip()
+        if self.customer_row is not None:
+            self.customer_row.transcript = heard
+            self.customer_row.save(update_fields=["transcript", "updated_at"])
+        if not heard:
+            return [self.reply("could_not_hear")]
         return self.on_parsed(result)
 
     def on_parsed(self, result: ParseOrderResult) -> list[Reply]:
@@ -688,6 +724,7 @@ def _run_turn(
     allowed: Callable[[Conversation], None],
     customer_message: Callable[[_Turn], tuple[str, dict[str, Any]]],
     handler: Callable[[_Turn], list[Reply]],
+    used_voice: bool = False,
 ) -> Sent:
     with transaction.atomic():
         conversation = _owned(customer, conversation_id, lock=True)
@@ -711,10 +748,12 @@ def _run_turn(
                 Sender.CUSTOMER,
                 MessageKind.TEXT,
                 text=text,
+                used_voice=used_voice,
                 payload=payload,
                 client_message_id=client_message_id,
             )
         ]
+        turn.customer_row = stored[0]
         now = timezone.now()
         conversation.last_activity_at = now
         conversation.expires_at = now + IDLE_EXPIRY
@@ -748,6 +787,30 @@ def send_text(
         allowed=allowed,
         customer_message=lambda turn: (text, {}),
         handler=lambda turn: turn.on_text(text),
+    )
+
+
+def send_voice(
+    customer: Customer,
+    conversation_id: uuid.UUID,
+    client_message_id: uuid.UUID,
+    audio: AudioInput,
+) -> Sent:
+    """The customer spoke. The clip is understood like a typed message in ``ordering``; the
+    customer's message holds what was heard (``transcript``) and never the audio."""
+
+    def allowed(conversation: Conversation) -> None:
+        if conversation.state != ConversationState.ORDERING:
+            raise InvalidActionForState
+
+    return _run_turn(
+        customer,
+        conversation_id,
+        client_message_id,
+        allowed=allowed,
+        customer_message=lambda turn: ("", {}),
+        handler=lambda turn: turn.on_voice(audio),
+        used_voice=True,
     )
 
 
@@ -888,4 +951,5 @@ __all__ = [
     "reconcile",
     "send_action",
     "send_text",
+    "send_voice",
 ]
