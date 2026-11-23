@@ -133,11 +133,27 @@ def test_a_failing_provider_is_reported_not_raised(
     from assistant.errors import AssistantTimeout
 
     monkeypatch.setattr(
-        "assistant.services.get_adapter",
-        lambda: FakeAdapter(fail_with=AssistantTimeout()),
+        "assistant.management.commands.assistant_spike.get_adapter",
+        lambda provider=None: FakeAdapter(fail_with=AssistantTimeout()),
     )
 
     text = spike("reply", "--text", "yes")
 
     assert "failed: timeout" in text
     assert AICallLog.objects.get().outcome == "timeout"
+
+
+def test_a_provider_can_be_chosen_for_one_run(settings: object) -> None:
+    settings.AI_PROVIDER = "gemini"  # type: ignore[attr-defined]
+    settings.GEMINI_API_KEY = ""  # type: ignore[attr-defined]
+
+    text = spike("reply", "--text", "yes", "--provider", "fake")
+
+    assert "Provider: fake" in text
+
+
+def test_a_provider_that_is_not_configured_is_a_clear_error(settings: object) -> None:
+    settings.GROQ_API_KEYS = ()  # type: ignore[attr-defined]
+
+    with pytest.raises(CommandError, match="GROQ_API_KEY_1"):
+        spike("reply", "--text", "yes", "--provider", "groq")

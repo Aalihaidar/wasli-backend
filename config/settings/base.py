@@ -16,7 +16,7 @@ from pathlib import Path
 import dj_database_url
 from corsheaders.defaults import default_headers
 
-from config.env import env_bool, env_choice, env_int
+from config.env import env_bool, env_choice, env_int, env_numbered
 from config.storage import media_storage
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -185,15 +185,34 @@ REQUIRE_SCREEN_ONLINE = env_bool("REQUIRE_SCREEN_ONLINE", default=False)
 # no service distance of its own is listed everywhere inside this distance).
 NEARBY_SEARCH_RADIUS_M = env_int("NEARBY_SEARCH_RADIUS_M", 3000, minimum=1)
 # The assistant layer only understands input (orders, car details, voice); it never writes
-# replies or prices. "fake" replays recorded outputs and is what the tests use.
-AI_PROVIDER = env_choice("AI_PROVIDER", "gemini", {"gemini", "fake"})
+# replies or prices. "groq" is the main provider (Whisper for voice, a text model to
+# understand), "gemini" is the second one kept to compare answers, and "fake" replays recorded
+# outputs and is what the tests use.
+AI_PROVIDER = env_choice("AI_PROVIDER", "gemini", {"gemini", "groq", "fake"})
+AI_TIMEOUT_SECONDS = env_int("AI_TIMEOUT_SECONDS", 15, minimum=1)
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")  # a secret: only in .env / Render
 # Never hard-coded: pick the audio-capable model in Google AI Studio and set it per environment.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
-AI_TIMEOUT_SECONDS = env_int("AI_TIMEOUT_SECONDS", 15, minimum=1)
-# Above this many assistant requests a day the bot switches to the no-assistant fallback.
-# A placeholder until the model and its free quota are chosen (about 80% of the quota).
-AI_DAILY_REQUEST_LIMIT = env_int("AI_DAILY_REQUEST_LIMIT", 100)
+# Above this many Gemini requests a day the backend stops calling it (counted from the call
+# log, the day starting at midnight Pacific like Google's). Keep it a little under the daily
+# limit shown in AI Studio, because Google's counts include what the backend cannot see.
+GEMINI_DAILY_REQUEST_LIMIT = env_int("GEMINI_DAILY_REQUEST_LIMIT", 18)
+
+# Groq keys are numbered, one variable each, in the order they are used: the first until it is
+# used up, then the second, and so on, and back to the first. Up to ten slots; an empty or
+# missing slot is skipped. Secrets: only in .env / Render.
+GROQ_MAX_KEYS = 10
+GROQ_API_KEYS = env_numbered("GROQ_API_KEY_", GROQ_MAX_KEYS)
+# Never hard-coded: copy the model codes from the Groq console's Models page.
+GROQ_CHAT_MODEL = os.environ.get("GROQ_CHAT_MODEL", "")
+GROQ_STT_MODEL = os.environ.get("GROQ_STT_MODEL", "")
+# What one key may do with each model, per minute and per day (the limits of the Groq console's
+# free plan; read your own there). The backend stays under them and moves to the next key.
+GROQ_CHAT_RPM = env_int("GROQ_CHAT_RPM", 30, minimum=1)
+GROQ_CHAT_RPD = env_int("GROQ_CHAT_RPD", 1000, minimum=1)
+GROQ_STT_RPM = env_int("GROQ_STT_RPM", 20, minimum=1)
+GROQ_STT_RPD = env_int("GROQ_STT_RPD", 2000, minimum=1)
 
 DATABASES = {
     "default": dict(
@@ -277,6 +296,9 @@ REST_FRAMEWORK: dict[str, object] = {
         "customer_contact": "10/hour",
         "customer_reset": "10/hour",
         "customer_reset_confirm": "10/min",
+        # The chat: opening a conversation, and every message or button tap in it.
+        "chat_open": "30/hour",
+        "chat_message": "40/min",
     },
 }
 DRF_STANDARDIZED_ERRORS = {
@@ -324,6 +346,11 @@ SPECTACULAR_SETTINGS = {
         "ErrorCode404Enum": f"{_ERROR_ENUMS}.ErrorCode404Enum.choices",
         "ErrorCode409Enum": "config.api_errors.ErrorCode409Enum.choices",
         "ErrorCode429Enum": "config.api_errors.ErrorCode429Enum.choices",
+        # Lists that grow (ADR 0012, 0019): an app treats a value it does not know as unknown.
+        "LocaleEnum": "customers.serializers.LOCALES",
+        "MessageKindEnum": "chat.models.MessageKind.choices",
+        "ConversationStateEnum": "chat.models.ConversationState.choices",
+        "OrderTypeEnum": "core.order_types.OrderType.choices",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
     # The package's hook names the error-code enums; ours then makes them extensible, because the

@@ -49,3 +49,17 @@ def env_int(name: str, default: int, *, minimum: int = 0) -> int:
     if value < minimum:
         raise ImproperlyConfigured(f"{name} must be at least {minimum} (got {value}).")
     return value
+
+
+def env_numbered(prefix: str, count: int) -> tuple[tuple[int, str], ...]:
+    """The values of ``<prefix>1`` to ``<prefix><count>``, each with its number, in number order.
+
+    An empty or missing variable is skipped, so a gap (a key removed from the middle) does not
+    stop the ones after it. Values are trimmed and never printed or logged.
+    """
+    found = []
+    for number in range(1, count + 1):
+        value = os.environ.get(f"{prefix}{number}", "").strip()
+        if value:
+            found.append((number, value))
+    return tuple(found)
