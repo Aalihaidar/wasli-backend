@@ -28,3 +28,13 @@ def test_log_lines_carry_the_request_id() -> None:
 
     assert "[{request_id}]" in logging_config["formatters"]["plain"]["format"]
     assert logging_config["handlers"]["console"]["filters"] == ["request_id"]
+
+
+def test_the_admin_keeps_djangos_default_upload_handlers() -> None:
+    """Only the voice endpoint reads an upload in memory (chat/uploads.py); the admin's image
+    uploads keep Django's handlers, which write a large file to a temporary file instead of
+    dropping it."""
+    assert settings.FILE_UPLOAD_HANDLERS == [
+        "django.core.files.uploadhandler.MemoryFileUploadHandler",
+        "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+    ]

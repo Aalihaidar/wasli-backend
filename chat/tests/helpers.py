@@ -12,11 +12,12 @@ import pytest
 from rest_framework.response import Response
 from rest_framework.test import APIClient
 
-from assistant.adapters.fake import FakeAdapter
+from assistant.adapters.fake import Call, FakeAdapter
 from assistant.errors import AssistantError
 from assistant.services import Assistant
 from assistant.types import (
     ActionType,
+    Completion,
     Language,
     OrderAction,
     OrderIntent,
@@ -179,3 +180,73 @@ def summary_of(response: Response) -> dict[str, Any]:
     assert found, response.json()
     summary: dict[str, Any] = found[-1]["payload"]["summary"]
     return summary
+
+
+# --- voice ---------------------------------------------------------------------------------
+
+
+def make_wav(seconds: float = 1.0, rate: int = 8000) -> bytes:
+    """A real, silent, mono 16-bit WAV clip of the given length (invented audio)."""
+    import io
+    import wave
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as clip:
+        clip.setnchannels(1)
+        clip.setsampwidth(2)
+        clip.setframerate(rate)
+        clip.writeframes(b"\x00\x00" * int(seconds * rate))
+    return buffer.getvalue()
+
+
+def heard(
+    monkeypatch: pytest.MonkeyPatch,
+    transcript: str | None,
+    *actions: OrderAction,
+    intent: OrderIntent = OrderIntent.ORDER_CHANGE,
+    **result_extra: Any,
+) -> FakeAdapter:
+    """A fake assistant that hears ``transcript`` in every clip and understands ``actions``.
+
+    It records what it was sent in ``adapter.calls``. The recorded fake keys its answers by what
+    a customer wrote, which a binary clip cannot do, so a voice test says what was heard."""
+    adapter = FakeAdapter()
+    result = ParseOrderResult(
+        transcript=transcript,
+        language=Language.EN,
+        intent=intent,
+        actions=list(actions),
+        **result_extra,
+    )
+
+    def parse_order(
+        menu: Any, lines: Any, pending: Any, message: Any, locale: str
+    ) -> Any:
+        adapter.calls.append(Call("parse_order", message, locale, {}))
+        return Completion(result, model="fake")
+
+    adapter.parse_order = parse_order  # type: ignore[method-assign,assignment]
+    monkeypatch.setattr("chat.engine.get_assistant", lambda: Assistant(adapter))
+    return adapter
+
+
+def say_voice(
+    api: APIClient,
+    conversation_id: str,
+    audio: bytes | None = None,
+    client_message_id: uuid.UUID | None = None,
+    content_type: str = "audio/wav",
+    **fields: Any,
+) -> Response:
+    """Send a clip as the app does: multipart with a ``client_message_id`` and an ``audio`` file."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    body: dict[str, Any] = {
+        "client_message_id": str(client_message_id or uuid.uuid4()),
+        **fields,
+    }
+    if audio is not None:
+        body["audio"] = SimpleUploadedFile("clip.wav", audio, content_type=content_type)
+    return api.post(
+        f"/api/v1/conversations/{conversation_id}/voice", body, format="multipart"
+    )

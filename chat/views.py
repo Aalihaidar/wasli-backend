@@ -10,6 +10,7 @@ from typing import Any
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import BaseThrottle, ScopedRateThrottle
@@ -24,7 +25,9 @@ from .serializers import (
     MessagesQuerySerializer,
     OpenConversationSerializer,
     SendMessageSerializer,
+    VoiceMessageSerializer,
 )
+from .uploads import AlwaysInMemoryUploadHandler
 
 TAGS = ["chat"]
 
@@ -143,4 +146,45 @@ class ConversationMessagesView(_ScopedPost):
                 lines=data.get("lines", []),
             )
             result = engine.send_action(customer, id, data["client_message_id"], action)
+        return Response(_chat(request, result), status=status.HTTP_201_CREATED)
+
+
+class ConversationVoiceView(_ScopedPost):
+    post_throttle_scope = "chat_message"
+    parser_classes = [MultiPartParser]  # noqa: RUF012
+
+    def initialize_request(self, request: Any, *args: Any, **kwargs: Any) -> Request:
+        # The clip is read into memory and never written to the disk, whatever its size.
+        request.upload_handlers = [AlwaysInMemoryUploadHandler(request)]
+        return super().initialize_request(request, *args, **kwargs)
+
+    @extend_schema(
+        operation_id="conversations_voice_create",
+        tags=TAGS,
+        summary="Send a voice message",
+        description=(
+            "One WAV clip of at most 30 seconds and 5 MB, with a `client_message_id`. The clip is "
+            "read in memory, understood like a typed message and dropped: it is never stored, and "
+            "only what was said stays on the customer's message (`used_voice: true` and the "
+            "`transcript`). The answer is the same as for a message, always `201`, and a replay "
+            "of the same `client_message_id` returns the first result. A clip nobody could "
+            "understand, and an assistant that is down, are not errors: the customer's message is "
+            "stored with an empty transcript and the bot answers in the chat (the second also "
+            "makes `ai_available` false for a few minutes). `400` codes: `audio_too_long`, "
+            "`audio_too_large` (the clip above 5 MB, or the whole request above 6 MB) and "
+            "`unsupported_audio_format` (only WAV for now). Allowed while the conversation is "
+            "in `ordering`; elsewhere `409 invalid_action_for_state`."
+        ),
+        request={"multipart/form-data": VoiceMessageSerializer},
+        responses={201: ChatSerializer},
+    )
+    def post(self, request: Request, id: uuid.UUID) -> Response:
+        serializer = VoiceMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = engine.send_voice(
+            get_customer(request),
+            id,
+            serializer.validated_data["client_message_id"],
+            serializer.validated_data["audio"],
+        )
         return Response(_chat(request, result), status=status.HTTP_201_CREATED)

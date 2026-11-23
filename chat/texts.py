@@ -73,6 +73,14 @@ _TEXTS: dict[str, dict[str, str]] = {
         "en": "I cannot understand typed or spoken orders right now. Please pick your items from the menu.",
         "ar": "لا أستطيع فهم الطلبات المكتوبة أو المنطوقة الآن. اختر أصنافك من القائمة.",
     },
+    "could_not_hear": {
+        "en": "Sorry, I could not hear that. Please say it again.",
+        "ar": "عذراً، لم أسمع ذلك جيداً. من فضلك قلها مرة أخرى.",
+    },
+    "voice_unavailable": {
+        "en": "I cannot understand voice messages right now. Please type your order or pick your items from the menu.",
+        "ar": "لا أستطيع فهم الرسائل الصوتية الآن. اكتب طلبك أو اختر أصنافك من القائمة.",
+    },
     "restaurant_unavailable": {
         "en": "This restaurant is not taking orders right now.",
         "ar": "هذا المطعم لا يستقبل الطلبات الآن.",

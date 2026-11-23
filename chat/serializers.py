@@ -15,6 +15,7 @@ from assistant.limits import MAX_LINES, MAX_QUANTITY, MAX_TEXT_CHARS
 from core.order_types import OrderType
 from customers.serializers import LOCALES
 
+from .audio import read_voice_upload
 from .models import Conversation, ConversationState, Message, MessageKind, Sender
 
 # The buttons and requests a customer can send. ``edit_field`` and ``skip_note`` belong to the
@@ -121,6 +122,21 @@ class SendMessageSerializer(serializers.Serializer):  # type: ignore[misc]
                 {needed: "This is required for this action."}, code="required"
             )
         return attrs
+
+
+class VoiceMessageSerializer(serializers.Serializer):  # type: ignore[misc]
+    client_message_id = serializers.UUIDField(
+        help_text="Made by the app for every message and kept for a retry, as for a text."
+    )
+    audio = serializers.FileField(
+        help_text=(
+            "One WAV clip of at most 30 seconds and 5 MB. It is read in memory and never "
+            "stored: only what was said stays on the message, as its transcript."
+        )
+    )
+
+    def validate_audio(self, upload: Any) -> Any:
+        return read_voice_upload(upload)
 
 
 class MessagesQuerySerializer(serializers.Serializer):  # type: ignore[misc]

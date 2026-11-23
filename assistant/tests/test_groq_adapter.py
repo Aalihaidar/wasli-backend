@@ -244,6 +244,72 @@ class TestUnderstandingVoice:
 
         assert session.calls[0].files["file"][0] == "clip.webm"
 
+    def test_whisper_is_asked_for_its_segments(self) -> None:
+        session = FakeSession(FakeResponse(body={"text": "x"}))
+
+        adapter(session).transcribe(CLIP, "en")
+
+        assert session.calls[0].data["response_format"] == "verbose_json"
+
+    def test_a_segment_whisper_says_is_not_speech_is_dropped(self) -> None:
+        # What Whisper really answered for two seconds of silence: "you", no_speech_prob 0.70.
+        session = FakeSession(
+            FakeResponse(
+                body={
+                    "text": " you",
+                    "segments": [{"text": " you", "no_speech_prob": 0.70}],
+                }
+            )
+        )
+
+        done = adapter(session).transcribe(CLIP, "en")
+
+        assert done.value.transcript is None
+
+    def test_only_the_speech_of_a_mixed_clip_is_kept(self) -> None:
+        session = FakeSession(
+            FakeResponse(
+                body={
+                    "text": " two karak thank you",
+                    "segments": [
+                        {"text": " two karak", "no_speech_prob": 0.02},
+                        {"text": " thank you", "no_speech_prob": 0.91},
+                    ],
+                }
+            )
+        )
+
+        done = adapter(session).transcribe(CLIP, "en")
+
+        assert done.value.transcript == "two karak"
+
+    def test_a_segment_at_the_threshold_is_kept(self) -> None:
+        session = FakeSession(
+            FakeResponse(body={"segments": [{"text": " a tea", "no_speech_prob": 0.6}]})
+        )
+
+        assert adapter(session).transcribe(CLIP, "en").value.transcript == "a tea"
+
+    def test_a_clip_of_silence_understands_nothing_without_a_chat_call(self) -> None:
+        session = FakeSession(
+            FakeResponse(
+                body={
+                    "text": " you",
+                    "segments": [{"text": " you", "no_speech_prob": 0.8}],
+                }
+            )
+        )
+
+        done = order(adapter(session), CLIP)
+
+        assert len(session.calls) == 1
+        assert done.value.intent is OrderIntent.UNCLEAR
+
+    def test_a_segment_without_a_probability_is_kept(self) -> None:
+        session = FakeSession(FakeResponse(body={"segments": [{"text": " a tea"}]}))
+
+        assert adapter(session).transcribe(CLIP, "en").value.transcript == "a tea"
+
     def test_a_transcription_without_text_is_invalid_output(self) -> None:
         session = FakeSession(FakeResponse(body={"nope": 1}))
 

@@ -56,6 +56,11 @@ USER_AGENT = "wasli-backend/1.0"
 # The longest a key is left alone after a "too many requests" answer, and the shortest.
 MAX_REST_SECONDS = 24 * 3600
 DEFAULT_REST_SECONDS = 60
+# Whisper invents a word or two for silence or noise ("you", "Thank you."), and says so: a
+# segment it thinks is not speech has a high ``no_speech_prob`` (0.70 for two seconds of silence).
+# A segment above this is dropped, so a clip with no speech is an empty transcript. A starting
+# value: the benchmark on real clips tunes it.
+NO_SPEECH_THRESHOLD = 0.6
 # The answer is JSON only, but a reasoning model also spends tokens thinking.
 MAX_COMPLETION_TOKENS = 4096
 
@@ -231,18 +236,26 @@ class GroqAdapter(AssistantAdapter):
 
     def _speech_to_text(self, audio: AudioInput) -> str:
         """The words in a clip, or an empty string when there are none. The clip is sent and
-        dropped."""
+        dropped. Segments Whisper itself marks as not speech are left out."""
         name = _AUDIO_FILE_NAMES.get(audio.mime_type, "clip.wav")
         body = self._post(
             keys.STT,
             "/audio/transcriptions",
             data={
                 "model": self.stt_model,
-                "response_format": "json",
+                "response_format": "verbose_json",
                 "temperature": "0",
             },
             files={"file": (name, audio.data, audio.mime_type)},
         )
+        segments = body.get("segments")
+        if isinstance(segments, list) and segments:
+            return "".join(
+                str(segment.get("text", ""))
+                for segment in segments
+                if isinstance(segment, dict)
+                and _as_number(segment.get("no_speech_prob")) <= NO_SPEECH_THRESHOLD
+            ).strip()
         text = body.get("text")
         if not isinstance(text, str):
             raise AssistantInvalidOutput("empty_output")
@@ -304,6 +317,10 @@ class GroqAdapter(AssistantAdapter):
             if not isinstance(parsed, dict):
                 raise AssistantInvalidOutput("bad_json")
             return parsed
+
+
+def _as_number(value: object) -> float:
+    return float(value) if isinstance(value, int | float) else 0.0
 
 
 def _retry_after(response: Any) -> int:

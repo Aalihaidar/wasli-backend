@@ -68,7 +68,19 @@ requests, are the limit. A real menu of many items is larger. If one request alo
 limit, no key can take it, and the call fails. Measure the prompt of the real restaurant's menu before the pilot
 (`assistant_spike order --restaurant <slug> ...` prints the tokens in and out).
 
-Whisper is limited in requests and in seconds of audio, which a 30-second clip does not come near.
+Whisper is limited in requests and in seconds of audio, which a 30-second clip does not come near. The voice endpoint takes a WAV clip of at most 30 seconds and 5 MB; the clip is sent to Whisper from memory and never stored ([ADR 0021](adr/0021-voice-is-read-in-memory-and-never-stored.md)).
+
+## Voice and silence
+
+Whisper invents a word or two for silence or noise: for two seconds of silence it answered "you". The adapter asks Whisper
+for its segments and drops those that Whisper itself marks as not speech (a `no_speech_prob` above 0.6), so a clip with no
+speech is an empty transcript and the chat asks the customer to say it again. The threshold is a starting value (the constant
+`NO_SPEECH_THRESHOLD` in `assistant/adapters/groq.py`); the benchmark on real clips tunes it. To try a clip yourself:
+
+```bash
+python manage.py assistant_spike transcribe --provider groq --audio clip.wav
+python manage.py assistant_spike order --provider groq --restaurant <slug> --audio clip.wav --locale ar
+```
 
 ## Check that it works
 
