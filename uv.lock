@@ -2334,7 +2334,7 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=27.0.1" },
     { name = "phonenumbers", specifier = ">=9.0.43" },
     { name = "pillow", specifier = ">=13.0.0" },
-    { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.8" },
+    { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.9" },
     { name = "pydantic", specifier = ">=2.14.3" },
     { name = "redis", specifier = ">=8.1.0" },
     { name = "requests", specifier = ">=2.34.2" },
