@@ -5,7 +5,8 @@ what comes back, how long it took and what it cost in tokens.
     python manage.py assistant_spike order --audio clip.wav --locale ar --repeat 3
     python manage.py assistant_spike transcribe --audio clip.webm
 
-It uses ``AI_PROVIDER`` (``fake`` needs no key). Every call is written to ``AICallLog`` like any
+It uses ``AI_PROVIDER`` (``fake`` needs no key), or ``--provider`` to send the same input to
+another one and compare. Every call is written to ``AICallLog`` like any
 other, so the day's quota count includes the spike. It never runs in production, and it prints
 only what the developer fed it. Use invented text or recorded test clips, never a customer's.
 """
@@ -15,13 +16,14 @@ from pathlib import Path
 from typing import Any
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from assistant import limits
 from assistant.errors import AssistantError, AssistantInputError
 from assistant.menu import build_prompt_menu
 from assistant.models import AICallLog
-from assistant.services import Assistant
+from assistant.services import Assistant, get_adapter
 from assistant.types import (
     AudioInput,
     CarFields,
@@ -111,6 +113,11 @@ class Command(BaseCommand):
         )
         parser.add_argument("--locale", choices=["en", "ar"], default="en")
         parser.add_argument(
+            "--provider",
+            choices=["groq", "gemini", "fake"],
+            help="Use this provider instead of AI_PROVIDER (to compare the same input).",
+        )
+        parser.add_argument(
             "--restaurant",
             help="For 'order': a restaurant slug whose menu is sent (default: an invented menu).",
         )
@@ -128,9 +135,13 @@ class Command(BaseCommand):
         if not 1 <= repeat <= 5:
             raise CommandError("--repeat must be between 1 and 5.")
         message = self._message(options)
-        assistant = Assistant()
+        try:
+            adapter = get_adapter(options["provider"])
+        except ImproperlyConfigured as error:
+            raise CommandError(str(error)) from error
+        assistant = Assistant(adapter)
         self.stdout.write(
-            f"Provider: {settings.AI_PROVIDER} · model: {settings.GEMINI_MODEL or '-'} · "
+            f"Provider: {adapter.name} · model: {getattr(adapter, 'model', '') or '-'} · "
             f"input: {'audio' if isinstance(message, AudioInput) else 'text'}"
         )
         for number in range(1, repeat + 1):

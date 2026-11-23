@@ -35,6 +35,8 @@ class ErrorCode409Enum(models.TextChoices):
     ACCOUNT_EXISTS = "account_exists"
     CONTACT_ALREADY_SET = "contact_already_set"
     NO_PENDING_CONTACT = "no_pending_contact"
+    INVALID_ACTION_FOR_STATE = "invalid_action_for_state"
+    CONVERSATION_EXPIRED = "conversation_expired"
 
 
 class Error409Serializer(serializers.Serializer):  # type: ignore[misc]

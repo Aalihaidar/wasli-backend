@@ -9,8 +9,10 @@ the car through a chat with the restaurant.
 > live at <https://wasli-staging.onrender.com>. Built: the data models, admin and tests of the
 > eight Wasli apps, the three public read endpoints, the ten customer-account endpoints
 > (sign-up with a verification code, sign-in, password reset), image storage on Cloudflare R2,
-> the assistant adapters, the API hardening baseline and the committed API contract. Next: the
-> order service, the conversation engine (D2) and the staff endpoints (D3). The checklist is
+> the assistant adapters, the API hardening baseline and the committed API contract. Since then:
+> the order service and the text chat (D2: open a conversation, send a message, read messages,
+> the order summary). Next: voice, the car question, the note, the review and the placed order,
+> then the staff endpoints (D3). The checklist is
 > [`docs/steps.md`](docs/steps.md); the design is in
 > [`docs/project-overview.md`](docs/project-overview.md).
 
@@ -41,9 +43,9 @@ Application libraries and their exact versions are pinned in `pyproject.toml` an
 | `messaging` | The outbox of emails and SMS (shown in the admin on local and staging, refused in production) and the delivery interface |
 | `chat` | Conversations and messages |
 | `orders` | Orders, order lines and the status history |
-| `assistant` | The adapters to the understanding provider (a fake one for tests, Gemini), the prompts and the log of calls |
+| `assistant` | The adapters to the understanding provider (Groq as the main one, Gemini as the second, a fake one for tests), the prompts, the key and quota counters and the log of calls |
 
-The order service, the conversation engine and the staff endpoints are not built yet.
+The car question, the note, the review, voice and the staff endpoints are not built yet.
 
 ## The API
 
@@ -53,6 +55,12 @@ The contract is [`openapi/schema.yaml`](openapi/schema.yaml), generated with
 - `GET /config`, `GET /restaurants/nearby` and `GET /restaurants/{slug}`: public, no token.
 - Ten endpoints under `/customers/` (`signup`, `verify`, `resend-code`, `login`, `logout`, `me`,
   `me/contact`, `me/contact/verify`, `password-reset`, `password-reset/confirm`).
+- The chat, with the customer token: `POST /restaurants/{slug}/conversations` (open the current
+  conversation or a new one), `GET /conversations/{id}/messages?after_seq=` (polled) and
+  `POST /conversations/{id}/messages` (text, or a button: `confirm`, `edit`, `choose`,
+  `set_lines`, `set_locale`, `restart`). The bot writes every message; the assistant only
+  understands ([ADR 0019](docs/adr/0019-the-conversation-engine.md), providers in
+  [`docs/groq-setup.md`](docs/groq-setup.md) and [`docs/gemini-setup.md`](docs/gemini-setup.md)).
 
 On local and staging, staff signed in through the admin can open Swagger UI at `/api/docs/`;
 production serves nothing there. The two Flutter repositories pin the contract by commit until

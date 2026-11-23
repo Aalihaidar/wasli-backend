@@ -8,7 +8,11 @@ import pytest
 from drf_spectacular.generators import SchemaGenerator
 
 from config.api_errors import ErrorCode403Enum, ErrorCode409Enum, ErrorCode429Enum
-from config.openapi_hooks import ERROR_CODE_LIST, make_error_codes_extensible
+from config.openapi_hooks import (
+    ERROR_CODE_LIST,
+    EXTENSIBLE_LISTS,
+    make_error_codes_extensible,
+)
 
 
 def document(**schemas: dict[str, Any]) -> dict[str, Any]:
@@ -51,6 +55,23 @@ class TestTheHook:
         assert schemas["LocaleEnum"]["enum"] == ["en", "ar"]
         assert schemas["ClientErrorEnum"]["enum"] == ["client_error"]
         assert "x-extensible-enum" not in schemas["LocaleEnum"]
+
+    def test_the_lists_that_grow_become_extensible_too(self) -> None:
+        result = make_error_codes_extensible(
+            document(
+                **{
+                    name: {"type": "string", "enum": ["a", "b"]}
+                    for name in EXTENSIBLE_LISTS
+                }
+            ),
+            None,
+            None,
+            True,
+        )
+
+        for name in EXTENSIBLE_LISTS:
+            schema = result["components"]["schemas"][name]
+            assert "enum" not in schema and schema["x-extensible-enum"] == ["a", "b"]
 
     def test_a_document_without_components_is_left_alone(self) -> None:
         assert make_error_codes_extensible({"paths": {}}, None, None, True) == {
@@ -108,3 +129,14 @@ class TestTheGeneratedContract:
 
     def test_real_enums_stay_closed(self, schemas: dict[str, Any]) -> None:
         assert schemas["LocaleEnum"]["enum"] == ["en", "ar"]
+
+    def test_the_chat_lists_are_extensible(self, schemas: dict[str, Any]) -> None:
+        assert set(schemas["MessageKindEnum"]["x-extensible-enum"]) >= {
+            "text",
+            "image",
+            "order_summary",
+        }
+        assert "ask_car" in schemas["ConversationStateEnum"]["x-extensible-enum"]
+        assert schemas["OrderTypeEnum"]["x-extensible-enum"][0] == "car"
+        for name in ("MessageKindEnum", "ConversationStateEnum", "OrderTypeEnum"):
+            assert "enum" not in schemas[name]

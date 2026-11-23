@@ -15,10 +15,10 @@ from typing import Any, TypeVar
 from django.conf import settings
 from pydantic import BaseModel
 
-from . import limits
+from . import limits, quota
 from .adapters.base import AssistantAdapter
 from .adapters.fake import FakeAdapter
-from .errors import AssistantError, AssistantInputError
+from .errors import AssistantBudgetExceeded, AssistantError, AssistantInputError
 from .models import AICallLog, InputKind, Outcome, Purpose
 from .types import (
     AudioInput,
@@ -36,13 +36,26 @@ from .types import (
 _R = TypeVar("_R", bound=BaseModel)
 
 
-def get_adapter() -> AssistantAdapter:
-    """The adapter named by ``AI_PROVIDER`` (``fake`` or ``gemini``)."""
-    if settings.AI_PROVIDER == "gemini":
+def get_adapter(provider: str | None = None) -> AssistantAdapter:
+    """The adapter named by ``AI_PROVIDER`` (``groq``, ``gemini`` or ``fake``), or by
+    ``provider`` when the developer spike compares another one."""
+    chosen = provider or settings.AI_PROVIDER
+    if chosen == "groq":
+        from .adapters.groq import GroqAdapter
+
+        return GroqAdapter.from_settings()
+    if chosen == "gemini":
         from .adapters.gemini import GeminiAdapter
 
         return GeminiAdapter.from_settings()
     return FakeAdapter.recorded()
+
+
+def check_budget(provider: str) -> None:
+    """Refuse a call when the provider's day is used up. Only Gemini has a daily budget counted
+    here; Groq keys count their own minute and day while they are chosen (``assistant.keys``)."""
+    if provider == "gemini" and not quota.gemini_budget_left():
+        raise AssistantBudgetExceeded
 
 
 def check_message(message: MessageInput) -> None:
@@ -153,6 +166,7 @@ class Assistant:
         error_code = ""
         completion: Completion[_R] | None = None
         try:
+            check_budget(self.adapter.name)
             completion = run()
         except AssistantError as error:
             outcome, error_code = error.outcome, error.code

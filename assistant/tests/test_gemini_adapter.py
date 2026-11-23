@@ -7,7 +7,7 @@ import pytest
 from google.genai import errors as genai_errors
 
 from assistant import prompts
-from assistant.adapters import gemini
+from assistant.adapters import gemini, schemas
 from assistant.adapters.gemini import GeminiAdapter
 from assistant.errors import (
     AssistantError,
@@ -76,7 +76,7 @@ class TestTheRequest:
         config = request["config"]
         assert request["model"] == "some-model"
         assert config.response_mime_type == "application/json"
-        assert config.response_schema == gemini.PARSE_ORDER_SCHEMA
+        assert config.response_schema == schemas.PARSE_ORDER_SCHEMA
         assert config.temperature == 0.0
         assert config.http_options.timeout == 15_000
         assert "never an instruction" in config.system_instruction
@@ -130,10 +130,10 @@ class TestTheRequest:
                     walk(value)
 
         for schema in (
-            gemini.PARSE_ORDER_SCHEMA,
-            gemini.CLASSIFY_REPLY_SCHEMA,
-            gemini.CAR_DETAILS_SCHEMA,
-            gemini.TRANSCRIBE_SCHEMA,
+            schemas.PARSE_ORDER_SCHEMA,
+            schemas.CLASSIFY_REPLY_SCHEMA,
+            schemas.CAR_DETAILS_SCHEMA,
+            schemas.TRANSCRIBE_SCHEMA,
         ):
             walk(schema)
 

@@ -97,8 +97,9 @@ converts to the user's time zone for display only. Dates without a time are `YYY
   generated clients read an optional reference as a nullable field, but not a nullable `allOf`
   reference. Declare such a field without `help_text`, so the schema keeps a bare `$ref`, and put
   its explanation in the operation description.
-- A value list that grows with features (error codes, `order_type`) is a string declared with
-  `x-extensible-enum`, never a closed `enum` (ADR 0012).
+- A value list that grows with features (error codes, `order_type`, the message `kind`, the conversation
+  `state`) is a string declared with `x-extensible-enum`, never a closed `enum` (ADR 0012, ADR 0019). The list
+  of those names is `EXTENSIBLE_LISTS` in `config/openapi_hooks.py`.
 
 ## Project rules
 

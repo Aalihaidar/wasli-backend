@@ -32,6 +32,13 @@ class AssistantRateLimited(AssistantError):
     code = "rate_limited"
 
 
+class AssistantBudgetExceeded(AssistantError):
+    """The day's budget for this provider is used up; nothing was sent to it."""
+
+    outcome = Outcome.BUDGET_EXCEEDED
+    code = "budget_exceeded"
+
+
 class AssistantInvalidOutput(AssistantError):
     outcome = Outcome.INVALID_OUTPUT
     code = "invalid_output"
