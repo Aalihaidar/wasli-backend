@@ -351,6 +351,7 @@ SPECTACULAR_SETTINGS = {
         "MessageKindEnum": "chat.models.MessageKind.choices",
         "ConversationStateEnum": "chat.models.ConversationState.choices",
         "OrderTypeEnum": "core.order_types.OrderType.choices",
+        "OrderStatusEnum": "orders.models.OrderStatus.choices",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
     # The package's hook names the error-code enums; ours then makes them extensible, because the

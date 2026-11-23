@@ -68,7 +68,7 @@ requests, are the limit. A real menu of many items is larger. If one request alo
 limit, no key can take it, and the call fails. Measure the prompt of the real restaurant's menu before the pilot
 (`assistant_spike order --restaurant <slug> ...` prints the tokens in and out).
 
-Whisper is limited in requests and in seconds of audio, which a 30-second clip does not come near. The voice endpoint takes a WAV clip of at most 30 seconds and 5 MB; the clip is sent to Whisper from memory and never stored ([ADR 0021](adr/0021-voice-is-read-in-memory-and-never-stored.md)).
+Whisper is limited in requests and in seconds of audio, which a 60-second clip does not come near. The voice endpoint takes a WAV clip of at most 60 seconds and 5 MB; the clip is sent to Whisper from memory and never stored ([ADR 0021](adr/0021-voice-is-read-in-memory-and-never-stored.md)).
 
 ## Voice and silence
 

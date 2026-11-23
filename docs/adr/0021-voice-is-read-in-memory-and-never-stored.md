@@ -15,7 +15,7 @@ silently drops anything above that size.
 - **`POST /api/v1/conversations/{id}/voice`** takes a multipart request with a `client_message_id` and one `audio` file and
   answers like a message (`201`, the customer's message and the bot's replies, a replay returns the first result). The clip is
   understood like a typed message in the `ordering` step; in any other state it is `409 invalid_action_for_state`.
-- **Only WAV for now** (the clip the customer app records), at most 30 seconds and 5 MB, checked on the file itself and not only
+- **Only WAV for now** (the clip the customer app records), at most 60 seconds and 5 MB, checked on the file itself and not only
   on its declared type (`chat/audio.py`). The refusals are `400` with `unsupported_audio_format`, `audio_too_long` and
   `audio_too_large`; a whole request above 6 MB is refused on `Content-Length` before any view (`audio_too_large`). Other types
   are added once they have been tried with real clips.

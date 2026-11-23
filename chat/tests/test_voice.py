@@ -350,13 +350,13 @@ class TestTheUpload:
         assert response.status_code == 400
         assert response.json()["errors"][0]["code"] == "unsupported_audio_format"
 
-    def test_thirty_seconds_are_accepted_and_a_little_more_is_not(
+    def test_a_minute_is_accepted_and_a_little_more_is_not(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, _, api, conversation_id = _chat(monkeypatch)
 
-        ok = say_voice(api, conversation_id, make_wav(30.0))
-        too_long = say_voice(api, conversation_id, make_wav(30.5))
+        ok = say_voice(api, conversation_id, make_wav(60.0))
+        too_long = say_voice(api, conversation_id, make_wav(60.5))
 
         assert ok.status_code == 201
         assert too_long.status_code == 400
@@ -403,7 +403,7 @@ class TestTheUpload:
     ) -> None:
         _, _, api, conversation_id = _chat(monkeypatch)
 
-        say_voice(api, conversation_id, make_wav(31))
+        say_voice(api, conversation_id, make_wav(61))
 
         assert Message.objects.filter(sender="customer").count() == 0
 
@@ -434,19 +434,19 @@ class TestWhoMayUseIt:
 
         assert say_voice(api, str(uuid.uuid4()), make_wav()).status_code == 404
 
-    def test_the_car_step_and_later_take_no_voice_yet(
-        self, monkeypatch: pytest.MonkeyPatch
+    @pytest.mark.parametrize("state", ["ask_car", "ask_note", "review"])
+    def test_the_later_open_steps_take_voice_as_their_own_answer(
+        self, monkeypatch: pytest.MonkeyPatch, state: str
     ) -> None:
         _, adapter, api, conversation_id = _chat(monkeypatch)
-        Conversation.objects.filter(pk=conversation_id).update(
-            state=ConversationState.ASK_CAR
-        )
+        Conversation.objects.filter(pk=conversation_id).update(state=state, lines=[])
 
         response = say_voice(api, conversation_id, make_wav())
 
-        assert response.status_code == 409
-        assert response.json()["errors"][0]["code"] == "invalid_action_for_state"
-        assert adapter.calls == []
+        assert response.status_code == 201
+        assert response.json()["messages"][0]["used_voice"] is True
+        # The order parser is for the ordering step only; each step reads the clip its own way.
+        assert not [c for c in adapter.calls if c.purpose == "parse_order"]
 
     def test_a_placed_conversation_takes_no_voice(
         self, monkeypatch: pytest.MonkeyPatch

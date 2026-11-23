@@ -16,40 +16,24 @@ accepts only a language change and a restart.
 
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
-from assistant.availability import ai_available, record_failure
-from assistant.errors import AssistantError
-from assistant.menu import build_prompt_menu
 from assistant.models import Outcome
 from assistant.services import Assistant
 from assistant.types import (
-    ActionType,
     AudioInput,
-    CurrentLine,
-    MessageInput,
-    OrderAction,
-    OrderIntent,
-    ParseOrderResult,
-    PromptMenu,
-    QuestionKind,
 )
 from core.locales import Locale
 from core.order_types import SUPPORTED_ORDER_TYPES
 from customers.models import Customer
-from menu.models import Option, OptionGroup
-from orders.errors import OrderError, OrderProblem, ProblemCode
-from orders.models import MAX_LINES
-from orders.pricing import PricedOrder, price_lines
+from orders.errors import OrderError, ProblemCode
 from restaurants.models import Restaurant, RestaurantMenuImage
 
 from .errors import ConversationExpired, InvalidActionForState, UnsupportedOrderType
-from .lines import Line, apply_actions, new_line, renumber
 from .models import (
     IDLE_EXPIRY,
     Conversation,
@@ -58,8 +42,9 @@ from .models import (
     MessageKind,
     Sender,
 )
+from .replies import Action, Reply
 from .services import add_message
-from .summary import summary_payload
+from .steps import Turn
 from .texts import pick, say
 
 # A provider failure of these kinds turns the assistant off for a few minutes. A badly formed
@@ -73,39 +58,36 @@ _UNMATCHED_SHOWN = 3
 _UNMATCHED_CHARS = 60
 _MAX_NOTE_CHARS = 200
 
-# The actions of the contract, and the states each is allowed in. A conversation past
-# ``ordering`` takes only a language change and a restart until its own steps are built.
-_ORDERING_ACTIONS = {"confirm", "edit", "choose", "set_lines"}
-_ANY_OPEN_STATE_ACTIONS = {"set_locale", "restart"}
+# The actions of the contract and the steps each is allowed in. ``set_locale`` and ``restart`` work
+# in every open step. Anything else is ``409 invalid_action_for_state``.
+_ALLOWED_ACTIONS: dict[str, set[str]] = {
+    ConversationState.ORDERING: {
+        "confirm",
+        "edit",
+        "choose",
+        "set_lines",
+        "set_locale",
+        "restart",
+    },
+    ConversationState.ASK_CAR: {"set_locale", "restart"},
+    ConversationState.ASK_NOTE: {"skip_note", "set_locale", "restart"},
+    ConversationState.REVIEW: {
+        "confirm",
+        "edit",
+        "edit_field",
+        "set_locale",
+        "restart",
+    },
+}
+
+
+# The button label of each part of the order that can be edited from the review.
+_FIELD_LABELS = {"items": "order", "car": "car", "note": "note"}
 
 
 def get_assistant() -> Assistant:
     """The assistant layer for a turn (a test replaces this with a scripted fake)."""
     return Assistant()
-
-
-# --- what a turn takes and gives --------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Action:
-    """A button the customer tapped, or the app's own request (the item picker)."""
-
-    name: str
-    field_name: str = ""
-    value: str = ""
-    locale: str = ""
-    lines: list[dict[str, Any]] = field(default_factory=list)
-
-
-@dataclass
-class Reply:
-    """One bot message, before it is stored."""
-
-    text: str
-    kind: str = MessageKind.TEXT
-    payload: dict[str, Any] = field(default_factory=dict)
-    image: str = ""
 
 
 class Opened(NamedTuple):
@@ -119,570 +101,11 @@ class Sent(NamedTuple):
     messages: list[Message]
 
 
-def _quick_replies(*buttons: dict[str, str]) -> dict[str, Any]:
-    return {"quick_replies": list(buttons)}
-
-
-# --- reading the order ------------------------------------------------------------------------
-
-
-@dataclass
-class Reconciled:
-    """The stored lines after every line was checked against the menu."""
-
-    lines: list[Line]
-    # Priced lines (those that are complete) and the numbers they carry in ``lines``.
-    priced: PricedOrder | None = None
-    priced_numbers: list[int] = field(default_factory=list)
-    # Names of items or options dropped because they are finished or unavailable.
-    unavailable: list[str] = field(default_factory=list)
-    # Lines kept but waiting for an option the customer has to choose.
-    incomplete: list[tuple[Line, OrderProblem]] = field(default_factory=list)
-
-
-def _is_uuid(value: object) -> bool:
-    try:
-        uuid.UUID(str(value))
-    except ValueError:
-        return False
-    return True
-
-
-class _Menu:
-    """The restaurant's visible items, for names and for the ids the assistant may use."""
-
-    def __init__(self, restaurant: Restaurant) -> None:
-        self.prompt: PromptMenu = build_prompt_menu(restaurant)
-        self.names = {
-            item.id: (item.name_en, item.name_ar or item.name_en)
-            for item in self.prompt.items
-        }
-        self.item_ids: set[str] = set(self.names)
-
-    def item_name(self, item_id: str, locale: str) -> str:
-        english, arabic = self.names.get(str(item_id), ("", ""))
-        return pick(english, arabic, locale)
-
-
-def reconcile(
-    restaurant: Restaurant, stored: list[Line], menu: _Menu, locale: str
-) -> Reconciled:
-    """Check every line, repairing what can be repaired without asking.
-
-    An item or option that is finished, an id that is not on this menu or a bad quantity is
-    dropped (and an unavailable one is reported); a note that is too long is cut; too many
-    options of a group are trimmed. A line that needs a required option the customer has not
-    chosen is kept as *incomplete* so the bot can ask. Raises ``OrderError`` only when the whole
-    restaurant cannot take orders.
-    """
-    work = [{**line, "option_ids": list(line["option_ids"])} for line in stored]
-    unavailable: list[str] = []
-    incomplete: list[tuple[Line, OrderProblem]] = []
-    priced: PricedOrder | None = None
-    active: list[Line] = []
-
-    for _attempt in range(len(work) * 3 + 3):
-        waiting = [entry for entry, _ in incomplete]
-        active = [e for e in work if not any(e is w for w in waiting)]
-        if not active:
-            priced = None
-            break
-        try:
-            priced = price_lines(restaurant, active)
-            break
-        except OrderError as error:
-            if error.codes & {
-                ProblemCode.RESTAURANT_UNAVAILABLE,
-                ProblemCode.TOO_MANY_LINES,
-                ProblemCode.EMPTY_ORDER,
-            }:
-                raise
-            by_position = dict(enumerate(active, start=1))
-            repaired = False
-            for problem in error.problems:
-                entry = by_position.get(problem.line or 0)
-                if entry is not None and _repair(
-                    entry, problem, work, incomplete, unavailable, menu, locale
-                ):
-                    repaired = True
-            if not repaired:
-                raise
-    else:  # pragma: no cover - every pass repairs at least one problem or raises
-        raise OrderError([])
-
-    renumber(work)
-    numbers = [entry["line"] for entry in active] if priced is not None else []
-    return Reconciled(
-        lines=work,
-        priced=priced,
-        priced_numbers=numbers,
-        unavailable=unavailable,
-        incomplete=incomplete,
-    )
-
-
-def _drop(work: list[Line], entry: Line) -> None:
-    work[:] = [other for other in work if other is not entry]
-
-
-def _repair(
-    entry: Line,
-    problem: OrderProblem,
-    work: list[Line],
-    incomplete: list[tuple[Line, OrderProblem]],
-    unavailable: list[str],
-    menu: _Menu,
-    locale: str,
-) -> bool:
-    """Fix or drop one problem line. Returns whether anything changed."""
-    code = problem.code
-    if code in {
-        ProblemCode.UNKNOWN_ITEM,
-        ProblemCode.INVALID_QUANTITY,
-        ProblemCode.INVALID_PRICE,
-    }:
-        _drop(work, entry)
-        return True
-    if code is ProblemCode.ITEM_UNAVAILABLE:
-        unavailable.append(menu.item_name(entry["item_id"], locale))
-        _drop(work, entry)
-        return True
-    if code is ProblemCode.NOTE_TOO_LONG:
-        entry["note"] = str(entry.get("note") or "").strip()[:_MAX_NOTE_CHARS]
-        return True
-    if code is ProblemCode.UNKNOWN_OPTION:
-        before = len(entry["option_ids"])
-        if problem.option_id is not None:
-            entry["option_ids"] = [
-                o for o in entry["option_ids"] if o != str(problem.option_id)
-            ]
-        else:
-            entry["option_ids"] = [o for o in entry["option_ids"] if _is_uuid(o)]
-        return len(entry["option_ids"]) != before
-    if code is ProblemCode.OPTION_UNAVAILABLE:
-        option = (
-            Option.objects.filter(pk=problem.option_id).first()
-            if problem.option_id is not None
-            else None
-        )
-        if option is not None:
-            unavailable.append(pick(option.name_en, option.name_ar_display, locale))
-        entry["option_ids"] = [
-            o for o in entry["option_ids"] if o != str(problem.option_id)
-        ]
-        return True
-    if code is ProblemCode.OPTION_RULE:
-        return _repair_option_rule(
-            entry, problem, work, incomplete, unavailable, menu, locale
-        )
-    return False
-
-
-def _repair_option_rule(
-    entry: Line,
-    problem: OrderProblem,
-    work: list[Line],
-    incomplete: list[tuple[Line, OrderProblem]],
-    unavailable: list[str],
-    menu: _Menu,
-    locale: str,
-) -> bool:
-    group = (
-        OptionGroup.objects.filter(pk=problem.group_id)
-        .prefetch_related("options")
-        .first()
-        if problem.group_id is not None
-        else None
-    )
-    if group is None:
-        _drop(work, entry)
-        return True
-    options = list(group.options.all())
-    in_group = [o for o in entry["option_ids"] if o in {str(x.pk) for x in options}]
-    if len(in_group) > group.max_select:
-        keep = set(in_group[: group.max_select])
-        entry["option_ids"] = [
-            o for o in entry["option_ids"] if o not in set(in_group) or o in keep
-        ]
-        return True
-    free = [o for o in options if o.is_available and str(o.pk) not in in_group]
-    if len(free) < group.min_select - len(in_group):
-        # The customer cannot complete this choice: treat the whole item as unavailable.
-        unavailable.append(menu.item_name(entry["item_id"], locale))
-        _drop(work, entry)
-        return True
-    incomplete.append((entry, problem))
-    return True
-
-
-# --- one turn ---------------------------------------------------------------------------------
-
-
-class _Turn:
-    """Everything one turn needs, and what the bot does in each step of ordering."""
-
-    def __init__(self, conversation: Conversation, assistant: Assistant) -> None:
-        self.conversation = conversation
-        self.restaurant = conversation.restaurant
-        self.assistant = assistant
-        self.menu = _Menu(self.restaurant)
-        # The customer's message of this turn, once it is stored (a voice turn adds its
-        # transcript to it).
-        self.customer_row: Message | None = None
-
-    @property
-    def locale(self) -> str:
-        return self.conversation.locale
-
-    def say(self, key: str, **names: object) -> str:
-        return say(key, self.locale, **names)
-
-    def reply(self, key: str, **names: object) -> Reply:
-        return Reply(self.say(key, **names))
-
-    # -- the order summary and the questions that can stand in its place ---------------------
-
-    def present(
-        self,
-        notices: list[str],
-        offered_choice: dict[str, Any] | None = None,
-        reconciled: Reconciled | None = None,
-    ) -> list[Reply]:
-        """Say what changed and then show the order, or ask what is still missing."""
-        conversation = self.conversation
-        rec = reconciled or reconcile(
-            self.restaurant, conversation.lines, self.menu, self.locale
-        )
-        conversation.lines = rec.lines
-        replies = [Reply(notice) for notice in notices]
-        if rec.unavailable:
-            replies.append(
-                self.reply(
-                    "unavailable", items=", ".join(dict.fromkeys(rec.unavailable))
-                )
-            )
-
-        question = self._option_question(rec) or self._item_question(offered_choice)
-        if question is not None:
-            replies.append(question)
-            return replies
-        conversation.pending_question = None
-
-        if rec.priced is None:
-            replies.append(self.reply("what_to_order"))
-            return replies
-        replies.append(
-            Reply(
-                self.say("summary_question"),
-                MessageKind.ORDER_SUMMARY,
-                {
-                    "summary": summary_payload(
-                        rec.priced, rec.priced_numbers, self.locale
-                    ),
-                    **_quick_replies(
-                        {"label": self.say("confirm_label"), "action": "confirm"},
-                        {"label": self.say("edit_label"), "action": "edit"},
-                    ),
-                },
-            )
-        )
-        return replies
-
-    def _option_question(self, rec: Reconciled) -> Reply | None:
-        """Ask for the next required option, derived from the lines themselves."""
-        if not rec.incomplete:
-            return None
-        entry, problem = rec.incomplete[0]
-        assert problem.group_id is not None  # noqa: S101
-        group = (
-            OptionGroup.objects.filter(pk=problem.group_id)
-            .prefetch_related("options")
-            .get()
-        )
-        chosen = set(entry["option_ids"])
-        buttons = [
-            {
-                "label": pick(option.name_en, option.name_ar_display, self.locale),
-                "action": "choose",
-                "value": str(option.pk),
-            }
-            for option in group.options.all()
-            if option.is_available and str(option.pk) not in chosen
-        ]
-        self.conversation.pending_question = {
-            "kind": QuestionKind.CHOOSE_OPTION.value,
-            "line": entry["line"],
-            "group_id": str(group.pk),
-        }
-        return Reply(
-            self.say(
-                "choose_option",
-                group=pick(group.name_en, group.name_ar_display, self.locale),
-                item=self.menu.item_name(entry["item_id"], self.locale),
-            ),
-            payload=_quick_replies(*buttons),
-        )
-
-    def _item_question(self, offered: dict[str, Any] | None) -> Reply | None:
-        """Ask which of several items the customer meant (the assistant found it unclear)."""
-        if not offered or offered.get("kind") != QuestionKind.CHOOSE_ITEM.value:
-            return None
-        item_ids = [i for i in offered.get("item_ids", []) if i in self.menu.item_ids]
-        if len(item_ids) < 2:
-            return None
-        mention = str(offered.get("mention") or "")[:_UNMATCHED_CHARS]
-        self.conversation.pending_question = {
-            "kind": QuestionKind.CHOOSE_ITEM.value,
-            "item_ids": item_ids,
-            "mention": mention,
-        }
-        text = (
-            self.say("choose_item", mention=mention)
-            if mention
-            else self.say("choose_item_plain")
-        )
-        buttons = [
-            {
-                "label": self.menu.item_name(item_id, self.locale),
-                "action": "choose",
-                "value": item_id,
-            }
-            for item_id in item_ids
-        ]
-        return Reply(text, payload=_quick_replies(*buttons))
-
-    # -- text ---------------------------------------------------------------------------------
-
-    def _current_lines(self) -> list[CurrentLine]:
-        return [
-            CurrentLine(
-                line=line["line"],
-                item_id=line["item_id"],
-                quantity=line["quantity"],
-                option_ids=tuple(line["option_ids"]),
-                note=line.get("note") or "",
-            )
-            for line in self.conversation.lines
-        ]
-
-    def _ask_assistant(self, message: MessageInput) -> ParseOrderResult:
-        conversation = self.conversation
-        return self.assistant.parse_order(
-            self.menu.prompt,
-            self._current_lines(),
-            conversation.pending_question,
-            message,
-            self.locale,
-            restaurant=self.restaurant,
-            conversation=conversation,
-        )
-
-    def _failed(self, error: AssistantError, unavailable: str) -> Reply:
-        """The bot's answer when the assistant could not be used for this input."""
-        if error.outcome in _OUTAGE:
-            record_failure()
-            return self.reply(unavailable)
-        if error.outcome == Outcome.BUDGET_EXCEEDED:
-            # Nothing was sent: the day's budget is used up, so the picker is offered.
-            return self.reply(unavailable)
-        return self.reply("not_understood")
-
-    def on_text(self, text: str) -> list[Reply]:
-        if not ai_available():
-            return [self.reply("assistant_down")]
-        try:
-            result = self._ask_assistant(text)
-        except AssistantError as error:
-            return [self._failed(error, "assistant_down")]
-        return self.on_parsed(result)
-
-    def on_voice(self, audio: AudioInput) -> list[Reply]:
-        """A spoken message goes to the assistant like a typed one, and what it heard is kept
-        on the customer's message as the transcript. The clip itself is dropped with this call."""
-        if not ai_available():
-            return [self.reply("voice_unavailable")]
-        try:
-            result = self._ask_assistant(audio)
-        except AssistantError as error:
-            if error.code in _UNREADABLE_AUDIO:
-                return [self.reply("could_not_hear")]
-            return [self._failed(error, "voice_unavailable")]
-        heard = (result.transcript or "").strip()
-        if self.customer_row is not None:
-            self.customer_row.transcript = heard
-            self.customer_row.save(update_fields=["transcript", "updated_at"])
-        if not heard:
-            return [self.reply("could_not_hear")]
-        return self.on_parsed(result)
-
-    def on_parsed(self, result: ParseOrderResult) -> list[Reply]:
-        conversation = self.conversation
-        if result.intent is OrderIntent.CANCEL:
-            conversation.lines = []
-            conversation.pending_question = None
-            return [self.reply("cleared")]
-        if result.intent is OrderIntent.CONFIRM:
-            return self.confirm()
-
-        applied = apply_actions(conversation.lines, result.actions, self.menu.item_ids)
-        conversation.lines = applied.lines
-
-        notices: list[str] = []
-        unmatched = [
-            " ".join(item.split())[:_UNMATCHED_CHARS]
-            for item in result.unmatched
-            if item.strip()
-        ][:_UNMATCHED_SHOWN]
-        if unmatched:
-            notices.append(self.say("unmatched", items=", ".join(unmatched)))
-        if applied.too_many:
-            notices.append(self.say("too_many_lines", limit=MAX_LINES))
-
-        offered = next(
-            (
-                {
-                    "kind": QuestionKind.CHOOSE_ITEM.value,
-                    "item_ids": question.item_ids,
-                    "mention": question.mention,
-                }
-                for question in result.questions
-                if question.kind is QuestionKind.CHOOSE_ITEM
-                and sum(i in self.menu.item_ids for i in question.item_ids) >= 2
-            ),
-            None,
-        )
-        if not (applied.changed or unmatched or applied.too_many or offered):
-            notices.append(self.say("not_understood"))
-            # Nothing changed: a question the customer has not answered is still open.
-            pending = conversation.pending_question
-            if pending and pending.get("kind") == QuestionKind.CHOOSE_ITEM.value:
-                offered = pending
-        return self.present(notices, offered)
-
-    # -- buttons ------------------------------------------------------------------------------
-
-    def confirm(self) -> list[Reply]:
-        """Move on to the car question when the order is complete and every line still stands;
-        otherwise say what changed or ask what is missing."""
-        conversation = self.conversation
-        if not conversation.lines:
-            return [self.reply("empty_order")]
-        rec = reconcile(self.restaurant, conversation.lines, self.menu, self.locale)
-        if rec.unavailable or rec.incomplete or rec.priced is None:
-            pending = conversation.pending_question
-            offered = pending if pending and "item_ids" in pending else None
-            return self.present([], offered, rec)
-        conversation.lines = rec.lines
-        conversation.pending_question = None
-        conversation.return_to_review = False
-        conversation.state = ConversationState.ASK_CAR
-        return [self.reply("car_question")]
-
-    def on_action(self, action: Action) -> list[Reply]:
-        conversation = self.conversation
-        if action.name == "confirm":
-            return self.confirm()
-        if action.name == "edit":
-            return [self.reply("edit_prompt")]
-        if action.name == "choose":
-            return self._choose(action.value)
-        if action.name == "set_lines":
-            conversation.lines = renumber(
-                [
-                    new_line(
-                        str(line["item_id"]),
-                        line["quantity"],
-                        [str(o) for o in line.get("option_ids", [])],
-                        line.get("note", ""),
-                    )
-                    for line in action.lines
-                ][:MAX_LINES]
-            )
-            conversation.pending_question = None
-            if not conversation.lines:
-                return [self.reply("empty_order")]
-            return self.present([])
-        if action.name == "set_locale":
-            conversation.locale = action.locale
-            if conversation.state == ConversationState.ORDERING:
-                return self.present([])
-            return [self.reply("car_question")]
-        if action.name == "restart":
-            self._clear_everything()
-            return [self.reply("restarted")]
-        raise InvalidActionForState  # pragma: no cover - checked before the turn
-
-    def _clear_everything(self) -> None:
-        conversation = self.conversation
-        conversation.lines = []
-        conversation.pending_question = None
-        conversation.pending_field = ""
-        conversation.return_to_review = False
-        conversation.parking_note = ""
-        conversation.vehicle_plate = ""
-        conversation.vehicle_model = ""
-        conversation.vehicle_colour = ""
-        conversation.order_note = ""
-        conversation.state = ConversationState.ORDERING
-
-    def _choose(self, value: str) -> list[Reply]:
-        """The customer tapped one of the buttons of a question the bot asked."""
-        conversation = self.conversation
-        question = conversation.pending_question or {}
-        kind = question.get("kind")
-        if kind == QuestionKind.CHOOSE_ITEM.value:
-            if value in question.get("item_ids", []) and value in self.menu.item_ids:
-                added = apply_actions(
-                    conversation.lines,
-                    [_add_action(value)],
-                    self.menu.item_ids,
-                )
-                conversation.lines = added.lines
-                conversation.pending_question = None
-                return self.present([])
-        elif kind == QuestionKind.CHOOSE_OPTION.value:
-            line = next(
-                (x for x in conversation.lines if x["line"] == question.get("line")),
-                None,
-            )
-            if line is not None and self._option_belongs(question, value):
-                line["option_ids"] = [*line["option_ids"], value]
-                conversation.pending_question = None
-                return self.present([])
-        conversation.pending_question = None
-        return self.present([self.say("stale_choice")])
-
-    @staticmethod
-    def _option_belongs(question: dict[str, Any], value: str) -> bool:
-        if not _is_uuid(value) or not _is_uuid(question.get("group_id")):
-            return False
-        return Option.objects.filter(
-            pk=value, group_id=question["group_id"], is_available=True
-        ).exists()
-
-    def choice_label(self, value: str) -> str:
-        """What the customer's tap is shown as in the history: the name of what they chose."""
-        if value in self.menu.item_ids:
-            return self.menu.item_name(value, self.locale)
-        if _is_uuid(value):
-            option = Option.objects.filter(pk=value).first()
-            if option is not None:
-                return pick(option.name_en, option.name_ar_display, self.locale)
-        return ""
-
-
-def _add_action(item_id: str) -> OrderAction:
-    return OrderAction(type=ActionType.ADD, item_id=item_id, quantity=1)
-
-
-# --- the turn around it -----------------------------------------------------------------------
-
-
 def _owned(
     customer: Customer, conversation_id: uuid.UUID, *, lock: bool
 ) -> Conversation:
     """The customer's own conversation. Another customer's, or an unknown id, is a 404."""
-    query = Conversation.objects.select_related("restaurant", "customer")
+    query = Conversation.objects.select_related("restaurant", "customer", "order")
     if lock:
         query = query.select_for_update(of=("self",))
     try:
@@ -722,8 +145,8 @@ def _run_turn(
     client_message_id: uuid.UUID,
     *,
     allowed: Callable[[Conversation], None],
-    customer_message: Callable[[_Turn], tuple[str, dict[str, Any]]],
-    handler: Callable[[_Turn], list[Reply]],
+    customer_message: Callable[[Turn], tuple[str, dict[str, Any]]],
+    handler: Callable[[Turn], list[Reply]],
     used_voice: bool = False,
 ) -> Sent:
     with transaction.atomic():
@@ -740,7 +163,7 @@ def _run_turn(
             raise ConversationExpired
         allowed(conversation)
 
-        turn = _Turn(conversation, get_assistant())
+        turn = Turn(conversation, get_assistant())
         text, payload = customer_message(turn)
         stored = [
             add_message(
@@ -777,8 +200,7 @@ def send_text(
     """The customer typed ``text``. In ``ordering`` the assistant reads it as an order change."""
 
     def allowed(conversation: Conversation) -> None:
-        if conversation.state != ConversationState.ORDERING:
-            raise InvalidActionForState
+        """Every open step takes a typed or spoken answer."""
 
     return _run_turn(
         customer,
@@ -800,8 +222,7 @@ def send_voice(
     customer's message holds what was heard (``transcript``) and never the audio."""
 
     def allowed(conversation: Conversation) -> None:
-        if conversation.state != ConversationState.ORDERING:
-            raise InvalidActionForState
+        """Every open step takes a typed or spoken answer."""
 
     return _run_turn(
         customer,
@@ -823,18 +244,22 @@ def send_action(
     """The customer tapped a button, or the app sent its own request (the item picker)."""
 
     def allowed(conversation: Conversation) -> None:
-        in_ordering = conversation.state == ConversationState.ORDERING
-        if action.name in _ORDERING_ACTIONS and not in_ordering:
-            raise InvalidActionForState
-        if action.name not in _ORDERING_ACTIONS | _ANY_OPEN_STATE_ACTIONS:
-            # ``edit_field`` and ``skip_note`` belong to steps that are not built yet.
+        if action.name not in _ALLOWED_ACTIONS.get(conversation.state, set()):
             raise InvalidActionForState
 
-    def customer_message(turn: _Turn) -> tuple[str, dict[str, Any]]:
+    def customer_message(turn: Turn) -> tuple[str, dict[str, Any]]:
         payload: dict[str, Any] = {"action": action.name}
         label = ""
         if action.name == "confirm":
-            label = turn.say("confirm_label")
+            in_review = turn.conversation.state == ConversationState.REVIEW
+            label = turn.say("yes_send_label" if in_review else "confirm_label")
+        elif action.name == "skip_note":
+            label = turn.say("skip_label")
+        elif action.name == "edit_field":
+            label = turn.say(
+                f"edit_{_FIELD_LABELS.get(action.field_name, 'order')}_label"
+            )
+            payload["field"] = action.field_name
         elif action.name == "edit":
             label = turn.say("edit_label")
         elif action.name == "restart":
@@ -857,6 +282,41 @@ def send_action(
         customer_message=customer_message,
         handler=lambda turn: turn.on_action(action),
     )
+
+
+def set_location(
+    customer: Customer,
+    conversation_id: uuid.UUID,
+    *,
+    lat: float,
+    lng: float,
+    accuracy_m: float | None,
+    source: str,
+) -> None:
+    """Keep the customer's position on the conversation until the order is placed; the latest
+    value wins. Nothing is said in the chat. The position is personal data: it goes to the
+    restaurant's staff with the order and is never logged or sent to the assistant."""
+    with transaction.atomic():
+        conversation = _owned(customer, conversation_id, lock=True)
+        if conversation.state == ConversationState.PLACED:
+            raise InvalidActionForState
+        if conversation.is_expired():
+            raise ConversationExpired
+        conversation.location_lat = lat
+        conversation.location_lng = lng
+        conversation.location_accuracy_m = accuracy_m
+        conversation.location_source = source
+        conversation.location_captured_at = timezone.now()
+        conversation.save(
+            update_fields=[
+                "location_lat",
+                "location_lng",
+                "location_accuracy_m",
+                "location_source",
+                "location_captured_at",
+                "updated_at",
+            ]
+        )
 
 
 def list_messages(
@@ -948,8 +408,8 @@ __all__ = [
     "Sent",
     "list_messages",
     "open_conversation",
-    "reconcile",
     "send_action",
     "send_text",
     "send_voice",
+    "set_location",
 ]

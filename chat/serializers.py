@@ -12,8 +12,11 @@ from rest_framework import serializers
 
 from assistant.availability import ai_available
 from assistant.limits import MAX_LINES, MAX_QUANTITY, MAX_TEXT_CHARS
+from core.geo import LocationSource, is_valid_location
 from core.order_types import OrderType
+from core.serializers import OmitWhenNone
 from customers.serializers import LOCALES
+from orders.models import Order
 
 from .audio import read_voice_upload
 from .models import Conversation, ConversationState, Message, MessageKind, Sender
@@ -130,13 +133,34 @@ class VoiceMessageSerializer(serializers.Serializer):  # type: ignore[misc]
     )
     audio = serializers.FileField(
         help_text=(
-            "One WAV clip of at most 30 seconds and 5 MB. It is read in memory and never "
+            "One WAV clip of at most 60 seconds and 5 MB. It is read in memory and never "
             "stored: only what was said stays on the message, as its transcript."
         )
     )
 
     def validate_audio(self, upload: Any) -> Any:
         return read_voice_upload(upload)
+
+
+class LocationSerializer(serializers.Serializer):  # type: ignore[misc]
+    lat = serializers.FloatField(help_text="Latitude of the phone, in degrees.")
+    lng = serializers.FloatField(help_text="Longitude of the phone, in degrees.")
+    accuracy_m = serializers.FloatField(
+        required=False,
+        help_text="How accurate the position is, in metres (zero or more), when the phone says.",
+    )
+    source = serializers.ChoiceField(
+        choices=[LocationSource.GPS.value, LocationSource.SIMULATED.value],
+        help_text="`gps`, or `simulated` for the test button on staging.",
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        if not is_valid_location(attrs["lat"], attrs["lng"], attrs.get("accuracy_m")):
+            raise serializers.ValidationError(
+                {"lat": "The position is outside the valid range."},
+                code="invalid_location",
+            )
+        return attrs
 
 
 class MessagesQuerySerializer(serializers.Serializer):  # type: ignore[misc]
@@ -147,11 +171,21 @@ class MessagesQuerySerializer(serializers.Serializer):  # type: ignore[misc]
     )
 
 
+class ConversationOrderSerializer(OmitWhenNone, serializers.ModelSerializer):  # type: ignore[misc]
+    class Meta:
+        model = Order
+        fields = ("id", "number", "status")
+        read_only_fields = fields
+
+
 class ConversationSerializer(serializers.ModelSerializer):  # type: ignore[misc]
     restaurant_slug = serializers.CharField(source="restaurant.slug", read_only=True)
     locale = serializers.ChoiceField(
         choices=LOCALES, read_only=True, help_text="The language the bot writes in."
     )
+    # Optional: absent until the order is placed (never null). No help text, so the schema keeps
+    # a bare reference that the generated clients read as an optional object.
+    order = ConversationOrderSerializer(required=False)
     ai_available = serializers.SerializerMethodField(
         help_text=(
             "False while the assistant cannot be used (it failed a moment ago, or it is "
@@ -170,6 +204,7 @@ class ConversationSerializer(serializers.ModelSerializer):  # type: ignore[misc]
             "order_type",
             "ai_available",
             "expires_at",
+            "order",
         )
         read_only_fields = fields
 

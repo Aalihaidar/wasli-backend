@@ -3,7 +3,7 @@
 Voice is never stored: the clip is read into memory, sent to the assistant and dropped, and only
 its transcript stays on the customer's message. This module decides whether a clip may be sent at
 all. Only WAV is accepted for now (the recorded clip of the customer app; other types come once
-they have been tried), and a clip is at most 30 seconds and 5 MB. Each refusal is a stable error
+they have been tried), and a clip is at most 60 seconds and 5 MB. Each refusal is a stable error
 code on the ``audio`` field.
 """
 
@@ -47,6 +47,7 @@ def read_voice_upload(upload: Any) -> AudioInput:
         )
     if frames / rate > limits.MAX_AUDIO_SECONDS:
         raise serializers.ValidationError(
-            "The clip is longer than 30 seconds.", code="audio_too_long"
+            f"The clip is longer than {limits.MAX_AUDIO_SECONDS} seconds.",
+            code="audio_too_long",
         )
     return AudioInput(data=data, mime_type="audio/wav")
