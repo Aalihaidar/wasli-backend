@@ -96,6 +96,74 @@ _TEXTS: dict[str, dict[str, str]] = {
             "وموديلها ولونها. قد يرفض المطعم الطلب إذا لم يعرف مكانك."
         ),
     },
+    "car_still_need": {
+        "en": "Thank you. I still need {items}.",
+        "ar": "شكراً. ما زلت بحاجة إلى {items}.",
+    },
+    "car_not_caught": {
+        "en": "I did not catch that. I still need {items}.",
+        "ar": "لم أفهم ذلك. ما زلت بحاجة إلى {items}.",
+    },
+    "car_show": {
+        "en": "This is what I have:\n{values}\nTell me what to change.",
+        "ar": "هذا ما لدي:\n{values}\nأخبرني ما الذي تريد تغييره.",
+    },
+    "car_no_change": {
+        "en": "I did not catch a change. Tell me what to change.",
+        "ar": "لم ألتقط أي تغيير. أخبرني ما الذي تريد تغييره.",
+    },
+    "car_unavailable": {
+        "en": "I cannot read your answer right now. Please try again in a few minutes.",
+        "ar": "لا أستطيع قراءة إجابتك الآن. حاول مرة أخرى بعد بضع دقائق.",
+    },
+    "car_label_parking_note": {
+        "en": "where your car is (the parking name and the spot)",
+        "ar": "مكان سيارتك (اسم الموقف والمكان)",
+    },
+    "car_label_plate": {"en": "the car number", "ar": "رقم السيارة"},
+    "car_label_model": {"en": "the car model", "ar": "موديل السيارة"},
+    "car_label_colour": {"en": "the car colour", "ar": "لون السيارة"},
+    "car_value_parking_note": {"en": "Parking", "ar": "الموقف"},
+    "car_value_plate": {"en": "Number", "ar": "الرقم"},
+    "car_value_model": {"en": "Model", "ar": "الموديل"},
+    "car_value_colour": {"en": "Colour", "ar": "اللون"},
+    "note_question": {
+        "en": "Any note for the order? You can skip.",
+        "ar": "هل لديك ملاحظة على الطلب؟ يمكنك التخطي.",
+    },
+    "note_edit": {
+        "en": "Your note is: “{note}”. Tell me the new note, or tap Keep to leave it.",
+        "ar": "ملاحظتك هي: «{note}». اكتب الملاحظة الجديدة، أو اضغط إبقاء لتركها.",
+    },
+    "note_too_long": {
+        "en": "A note can have at most {limit} characters. Please make it shorter.",
+        "ar": "يمكن أن تحتوي الملاحظة على {limit} حرفاً كحد أقصى. اجعلها أقصر من فضلك.",
+    },
+    "review_question": {
+        "en": "Shall I send the order to the restaurant?",
+        "ar": "هل أرسل الطلب إلى المطعم؟",
+    },
+    "review_edit_prompt": {
+        "en": "What would you like to edit?",
+        "ar": "ماذا تريد أن تعدّل؟",
+    },
+    "use_buttons": {
+        "en": "I cannot read free text right now. Please use the buttons.",
+        "ar": "لا أستطيع قراءة النص الحر الآن. استخدم الأزرار من فضلك.",
+    },
+    "placed": {
+        "en": "Your order #{number} was sent. Waiting for the restaurant to confirm.",
+        "ar": "تم إرسال طلبك رقم {number}. بانتظار تأكيد المطعم.",
+    },
+    "outside_service_distance": {
+        "en": "Sorry, you seem to be outside the area this restaurant serves. Please move closer and send the order again.",
+        "ar": "عذراً، يبدو أنك خارج المنطقة التي يخدمها هذا المطعم. اقترب وأرسل الطلب مرة أخرى.",
+    },
+    "yes_send_label": {"en": "Yes, send", "ar": "نعم، أرسل"},
+    "keep_label": {"en": "Keep", "ar": "إبقاء"},
+    "edit_order_label": {"en": "Order", "ar": "الطلب"},
+    "edit_car_label": {"en": "Car and parking", "ar": "السيارة والموقف"},
+    "edit_note_label": {"en": "Note", "ar": "الملاحظة"},
     # The labels of buttons, also the text kept for a customer's tap.
     "confirm_label": {"en": "Confirm", "ar": "تأكيد"},
     "edit_label": {"en": "Edit", "ar": "تعديل"},

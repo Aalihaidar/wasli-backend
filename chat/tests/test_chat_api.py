@@ -741,13 +741,14 @@ class TestButtons:
             assert response.status_code == 409
             assert response.json()["errors"][0]["code"] == "invalid_action_for_state"
 
-    def test_after_the_car_question_only_a_language_change_and_a_restart_are_taken(
+    def test_at_the_car_question_the_buttons_of_other_steps_are_refused(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         api, conversation_id, _ = self._with_order(monkeypatch)
         tap(api, conversation_id, "confirm")
 
-        assert say_text(api, conversation_id, "A 12345").status_code == 409
+        # A typed answer is read as the car answer now (the car step is built).
+        assert say_text(api, conversation_id, "A 12345").status_code == 201
         assert tap(api, conversation_id, "confirm").status_code == 409
         assert tap(api, conversation_id, "edit").status_code == 409
 

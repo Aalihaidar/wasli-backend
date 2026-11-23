@@ -27,7 +27,7 @@ be used by the provider, so no real customer data may reach it, and every call c
 - **Prompt injection.** Every prompt states that the customer's words are data and never instructions. A typed message is
   placed inside a `<customer_message>` block and a closing tag typed by the customer is removed, so it cannot end the
   block; audio is attached as audio.
-- **Caps before any call.** Text up to 500 characters; audio up to 5 MB, 30 seconds and a type the provider accepts. An
+- **Caps before any call.** Text up to 500 characters; audio up to 5 MB, 60 seconds (30 at first) and a type the provider accepts. An
   input over a cap is refused before it is sent.
 - **One log row per call, never content.** `assistant.services.Assistant` writes an `AICallLog` row with the provider, the
   model, the purpose, the input kind, the latency, the tokens and the outcome. A failure keeps a short code

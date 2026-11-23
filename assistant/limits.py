@@ -3,9 +3,9 @@ they are checked before anything is sent to a provider."""
 
 # A typed answer or message.
 MAX_TEXT_CHARS = 500
-# One voice clip: at most 30 seconds, and 5 MB (the request cap in config/settings allows a little
+# One voice clip: at most 60 seconds, and 5 MB (the request cap in config/settings allows a little
 # more for the multipart framing).
-MAX_AUDIO_SECONDS = 30
+MAX_AUDIO_SECONDS = 60
 MAX_AUDIO_BYTES = 5 * 1024 * 1024
 # An order.
 MAX_LINES = 20

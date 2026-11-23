@@ -22,6 +22,7 @@ from restaurants.services import public_restaurants
 from . import engine
 from .serializers import (
     ChatSerializer,
+    LocationSerializer,
     MessagesQuerySerializer,
     OpenConversationSerializer,
     SendMessageSerializer,
@@ -163,7 +164,7 @@ class ConversationVoiceView(_ScopedPost):
         tags=TAGS,
         summary="Send a voice message",
         description=(
-            "One WAV clip of at most 30 seconds and 5 MB, with a `client_message_id`. The clip is "
+            "One WAV clip of at most 60 seconds and 5 MB, with a `client_message_id`. The clip is "
             "read in memory, understood like a typed message and dropped: it is never stored, and "
             "only what was said stays on the customer's message (`used_voice: true` and the "
             "`transcript`). The answer is the same as for a message, always `201`, and a replay "
@@ -188,3 +189,35 @@ class ConversationVoiceView(_ScopedPost):
             serializer.validated_data["audio"],
         )
         return Response(_chat(request, result), status=status.HTTP_201_CREATED)
+
+
+class ConversationLocationView(CustomerView):
+    @extend_schema(
+        operation_id="conversations_location_update",
+        tags=TAGS,
+        summary="Send the phone's position",
+        description=(
+            "The phone's position, sent by the app when the car question appears. It is kept on "
+            "the conversation until the order is placed, the latest value wins, and it goes to "
+            "the restaurant's staff with the order. `204` with no body. Allowed in any open "
+            "step; a placed conversation is `409 invalid_action_for_state` and an expired one "
+            "`409 conversation_expired`. A latitude outside -90 to 90, a longitude outside -180 "
+            "to 180 or a negative `accuracy_m` is `400 invalid_location`. Another customer's "
+            "conversation is a `404`."
+        ),
+        request=LocationSerializer,
+        responses={204: None},
+    )
+    def put(self, request: Request, id: uuid.UUID) -> Response:
+        serializer = LocationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        engine.set_location(
+            get_customer(request),
+            id,
+            lat=data["lat"],
+            lng=data["lng"],
+            accuracy_m=data.get("accuracy_m"),
+            source=data["source"],
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)

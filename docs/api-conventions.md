@@ -96,7 +96,9 @@ converts to the user's time zone for display only. Dates without a time are `YYY
   `GET /api/v1/restaurants/nearby`). Nullable scalars, such as `logo_url`, are allowed. The
   generated clients read an optional reference as a nullable field, but not a nullable `allOf`
   reference. Declare such a field without `help_text`, so the schema keeps a bare `$ref`, and put
-  its explanation in the operation description.
+  its explanation in the operation description. `core.serializers.OmitWhenNone` leaves such a property out
+  when it has no value (a missing related object counts as none), as `Conversation.order` does before the
+  order is placed.
 - A value list that grows with features (error codes, `order_type`, the message `kind`, the conversation
   `state`) is a string declared with `x-extensible-enum`, never a closed `enum` (ADR 0012, ADR 0019). The list
   of those names is `EXTENSIBLE_LISTS` in `config/openapi_hooks.py`.

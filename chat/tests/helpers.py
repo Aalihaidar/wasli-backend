@@ -250,3 +250,156 @@ def say_voice(
     return api.post(
         f"/api/v1/conversations/{conversation_id}/voice", body, format="multipart"
     )
+
+
+# --- the steps after ordering --------------------------------------------------------------
+
+FULL_CAR = "Parking B2 near the lift, plate A 12345, white Toyota Camry"
+PARTIAL_CAR = "I'm at the entrance, the car is black"
+
+
+@dataclass
+class Flow:
+    """A customer, their client and a conversation, with a fake assistant that knows the
+    recorded car answers, replies and notes of the fake adapter (plus any ``extra`` script)."""
+
+    world: World
+    adapter: FakeAdapter
+    customer: Customer
+    api: APIClient
+    cid: str
+
+
+def recorded(
+    monkeypatch: pytest.MonkeyPatch, extra: dict[tuple[str, str], Any] | None = None
+) -> FakeAdapter:
+    from assistant.adapters.fake import (
+        RECORDED_CARS,
+        RECORDED_REPLIES,
+        RECORDED_TRANSCRIPTS,
+    )
+
+    script: dict[tuple[str, str], Any] = {}
+    script.update({("extract_car_details", k): v for k, v in RECORDED_CARS.items()})
+    script.update({("classify_reply", k): v for k, v in RECORDED_REPLIES.items()})
+    script.update({("transcribe", k): v for k, v in RECORDED_TRANSCRIPTS.items()})
+    script.update(extra or {})
+    return scripted(monkeypatch, script)
+
+
+def start(
+    monkeypatch: pytest.MonkeyPatch,
+    extra: dict[tuple[str, str], Any] | None = None,
+    **restaurant_extra: Any,
+) -> Flow:
+    world = make_world(**restaurant_extra)
+    adapter = recorded(monkeypatch, extra)
+    customer, api = signed_in()
+    cid = open_chat(api).json()["conversation"]["id"]
+    return Flow(world, adapter, customer, api, cid)
+
+
+def at_car(
+    monkeypatch: pytest.MonkeyPatch,
+    extra: dict[tuple[str, str], Any] | None = None,
+    **restaurant_extra: Any,
+) -> Flow:
+    """Two karak tea on the order and Confirm tapped: the car question is open."""
+    flow = start(monkeypatch, extra, **restaurant_extra)
+    response = tap(
+        flow.api,
+        flow.cid,
+        "set_lines",
+        lines=[{"item_id": str(flow.world.karak.pk), "quantity": 2}],
+    )
+    assert response.status_code == 201
+    assert (
+        tap(flow.api, flow.cid, "confirm").json()["conversation"]["state"] == "ask_car"
+    )
+    return flow
+
+
+def at_note(
+    monkeypatch: pytest.MonkeyPatch,
+    extra: dict[tuple[str, str], Any] | None = None,
+    **restaurant_extra: Any,
+) -> Flow:
+    flow = at_car(monkeypatch, extra, **restaurant_extra)
+    response = say_text(flow.api, flow.cid, FULL_CAR)
+    assert response.json()["conversation"]["state"] == "ask_note"
+    return flow
+
+
+def at_review(
+    monkeypatch: pytest.MonkeyPatch,
+    extra: dict[tuple[str, str], Any] | None = None,
+    **restaurant_extra: Any,
+) -> Flow:
+    flow = at_note(monkeypatch, extra, **restaurant_extra)
+    response = say_text(flow.api, flow.cid, "No straw please")
+    assert response.json()["conversation"]["state"] == "review"
+    return flow
+
+
+def put_location(
+    api: APIClient,
+    conversation_id: str,
+    lat: float = 25.2005,
+    lng: float = 55.2705,
+    accuracy_m: float | None = 12,
+    source: str = "gps",
+) -> Response:
+    body: dict[str, Any] = {"lat": lat, "lng": lng, "source": source}
+    if accuracy_m is not None:
+        body["accuracy_m"] = accuracy_m
+    return api.put(
+        f"/api/v1/conversations/{conversation_id}/location", body, format="json"
+    )
+
+
+def last_bot(response: Response) -> dict[str, Any]:
+    bots = [m for m in response.json()["messages"] if m["sender"] == "bot"]
+    return dict(bots[-1])
+
+
+def hears(
+    monkeypatch: pytest.MonkeyPatch,
+    transcript: str | None,
+    **car: Any,
+) -> FakeAdapter:
+    """A fake assistant that hears ``transcript`` in every clip: it answers the car question
+    with ``car``, transcribes a note, and reads a reply to the review as a clear yes."""
+    from assistant.types import (
+        CarDetailsResult,
+        ClassifyReplyResult,
+        ReplyIntent,
+        TranscribeResult,
+    )
+
+    adapter = FakeAdapter()
+
+    def extract(current: Any, asked: Any, message: Any, locale: str) -> Any:
+        adapter.calls.append(
+            Call("extract_car_details", message, locale, {"asked": asked})
+        )
+        return Completion(
+            CarDetailsResult(transcript=transcript, language=Language.EN, **car),
+            model="fake",
+        )
+
+    def transcribe(audio: Any, locale: str) -> Any:
+        adapter.calls.append(Call("transcribe", audio, locale, {}))
+        return Completion(TranscribeResult(transcript=transcript), model="fake")
+
+    def classify(message: Any, locale: str) -> Any:
+        adapter.calls.append(Call("classify_reply", message, locale, {}))
+        return Completion(
+            ClassifyReplyResult(transcript=transcript, intent=ReplyIntent.CONFIRM),
+            model="fake",
+        )
+
+    adapter.extract_car_details = extract  # type: ignore[method-assign]
+    adapter.transcribe = transcribe  # type: ignore[method-assign,assignment]
+    adapter.classify_reply = classify  # type: ignore[method-assign]
+    monkeypatch.setattr("chat.engine.get_assistant", lambda: Assistant(adapter))
+    return adapter

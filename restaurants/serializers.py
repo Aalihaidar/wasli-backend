@@ -7,6 +7,7 @@ Prices are integers in fils (``*_minor``); the API never sends formatted prices.
 from rest_framework import serializers
 
 from core.geo import is_valid_location
+from core.serializers import OmitWhenNone
 from menu.models import MenuCategory, MenuItem, Option, OptionGroup
 
 from .models import Restaurant, RestaurantMenuImage
@@ -32,15 +33,7 @@ def arabic_text(source: str) -> serializers.CharField:
     )
 
 
-class _OmitWhenNone:
-    """Leaves the property out of the response, never ``null``, when it has no value: the
-    contract has no nullable references and a missing value is an optional property."""
-
-    def get_attribute(self, instance: object) -> object:
-        value = super().get_attribute(instance)  # type: ignore[misc]
-        if value is None:
-            raise serializers.SkipField()
-        return value
+_OmitWhenNone = OmitWhenNone
 
 
 class OptionalIntegerField(_OmitWhenNone, serializers.IntegerField):  # type: ignore[misc]
