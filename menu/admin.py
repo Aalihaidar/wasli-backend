@@ -51,12 +51,19 @@ class MenuCategoryAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         "parent",
         "name_en",
         "name_ar",
+        "image",
+        "picture_preview",
         "sort_order",
         "is_active",
     )
+    readonly_fields = ("picture_preview",)
     inlines: ClassVar[list[type[admin.options.InlineModelAdmin]]] = [  # type: ignore[type-arg]
         MenuItemInline
     ]
+
+    @admin.display(description="Picture preview")
+    def picture_preview(self, obj: MenuCategory) -> SafeString:
+        return thumbnail(obj.image, large=True)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[MenuCategory]:
         return (

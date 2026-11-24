@@ -5,6 +5,7 @@ from django.core.validators import MinValueValidator
 from django.db import models, transaction
 
 from core.locales import ARABIC_OPTIONAL_HELP, ArabicFallbackMixin, arabic_or_english
+from core.media_paths import IMAGE_NAME_LENGTH, category_image_path, item_image_path
 from core.tenancy import RestaurantOwnedModel, align_with_parent
 
 MAX_ALIASES = 20
@@ -58,6 +59,12 @@ class MenuCategory(ArabicFallbackMixin, RestaurantOwnedModel):
     name_ar = models.CharField(
         max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
     )
+    image = models.ImageField(
+        upload_to=category_image_path,
+        max_length=IMAGE_NAME_LENGTH,
+        blank=True,
+        help_text="Optional. A picture of this category, subcategory or sub-subcategory.",
+    )
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -73,6 +80,10 @@ class MenuCategory(ArabicFallbackMixin, RestaurantOwnedModel):
 
     def __str__(self) -> str:
         return f"{self.restaurant}: {self.path}"
+
+    def lineage(self) -> list[MenuCategory]:
+        """The categories from the top one down to this one (used for the image folders)."""
+        return list(reversed(self._chain()))
 
     def _chain(self) -> list[MenuCategory]:
         """This category and its parents, from itself up to the top. It stops after
@@ -154,7 +165,9 @@ class MenuItem(ArabicFallbackMixin, RestaurantOwnedModel):
     description_en = models.TextField(blank=True)
     description_ar = models.TextField(blank=True, help_text=ARABIC_OPTIONAL_HELP)
     price_minor = models.PositiveIntegerField(help_text="In fils: 1250 is 12.50 AED.")
-    image = models.ImageField(upload_to="menu/items/", blank=True)
+    image = models.ImageField(
+        upload_to=item_image_path, max_length=IMAGE_NAME_LENGTH, blank=True
+    )
     # Unavailable items stay on the menu but cannot be ordered.
     is_available = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)

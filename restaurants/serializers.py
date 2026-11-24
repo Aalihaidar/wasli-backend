@@ -161,11 +161,12 @@ class MenuCategorySerializer(serializers.ModelSerializer):  # type: ignore[misc]
         ),
     )
     name_ar = arabic_name()
+    image_url = serializers.ImageField(source="image", read_only=True, allow_null=True)
     items = MenuItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = MenuCategory
-        fields = ("id", "parent_id", "name_en", "name_ar", "items")
+        fields = ("id", "parent_id", "name_en", "name_ar", "image_url", "items")
         read_only_fields = fields
 
 
