@@ -164,7 +164,7 @@ own pull request, and after each one the frontend is told the commit to pin:
    Confirm and Edit. Needs the Gemini key from here on (the owner's steps are in `docs/gemini-setup.md`). Built ([ADR 0019](adr/0019-the-conversation-engine.md)): the endpoints `POST /restaurants/{slug}/conversations`, `GET` and `POST /conversations/{id}/messages`, and the engine up to the order summary and Confirm.
 4. Voice: the upload endpoint, its limits and the transcript on the customer's message. Built in the ordering step ([ADR 0021](adr/0021-voice-is-read-in-memory-and-never-stored.md)); the voice paths of the car answer and the note come with their step.
 5. Car and position: the car question, the note, `PUT /conversations/{id}/location`, the final review and the placed order. Built ([ADR 0022](adr/0022-the-car-the-note-the-review-and-placing.md)).
-6. The fallbacks without the assistant (item picker, one car question at a time) and the budget guard.
+6. The fallbacks without the assistant (item picker, one car question at a time) and the budget guard. Built: the item picker (`set_lines`), the budget guard and the car question one item at a time ([ADR 0022](adr/0022-the-car-the-note-the-review-and-placing.md), addendum).
 
 - [x] `assistant`: fake adapter with recorded outputs (used by every test), prompts and call logging (one `AICallLog` row per call, never the content)
 - [x] `assistant`: Groq as the main provider (`assistant/adapters/groq.py`: Whisper for voice, a text model to understand, JSON mode validated like every provider), the numbered keys used in order with per-key limits and a rest after a `429` (`assistant/keys.py`, `assistant/quota.py`), Gemini's daily budget counted from the call log (`GEMINI_DAILY_REQUEST_LIMIT`), `assistant_spike --provider`, tests against a fake HTTP session; run against the real Groq keys with invented Arabic, English and mixed sentences, all matched ([ADR 0020](adr/0020-groq-is-the-main-assistant-provider.md), `docs/groq-setup.md`); the voice path is not run yet (it needs a recorded clip)
@@ -179,7 +179,7 @@ own pull request, and after each one the frontend is told the commit to pin:
 - [x] `orders/services.py` `place_order`: order creation in one transaction (the phone check first, then the conversation and the restaurant row locked, everything priced and checked again, the next number, copies of the lines, the car, the note and the position, the distance to the restaurant, the `enforce` location rule, an event, the car saved for next time, the conversation placed), unit-tested; the bot message is added by the engine in the same transaction ([ADR 0018](adr/0018-placing-an-order.md))
 - [x] Voice in the ordering step: `POST /conversations/{id}/voice` (multipart `client_message_id` and one WAV `audio`, at most 60 seconds and 5 MB, checked on the file itself), read in memory and never stored, understood like a typed message, the transcript kept on the customer's message, an empty transcript (Whisper's segments marked as not speech are dropped, so silence is empty) or a clip the provider cannot read asked again in the chat, an outage or a used-up budget answered in the chat, `audio_too_long`, `audio_too_large` and `unsupported_audio_format` as `400`, tested with real WAV bytes and a fake assistant
 - [x] Voice paths of the car answer, the note (transcribed) and the review (a spoken yes, edit or cancel), the same limits (60 seconds, 5 MB) and an empty transcript asked again
-- [ ] The fallbacks without the assistant for the car question (the four details one at a time); `set_lines`, the typed-order fallback and the "cannot read your answer right now" message are built
+- [x] The fallbacks without the assistant: the car question one item at a time (parking, plate, model, colour; each typed answer checked by `orders/car.py`; a conversation that started them finishes them; editing from the review asks all four again; voice is said to be unavailable), `set_lines` and the typed-order fallback
 - [x] Endpoints: create or get a conversation, messages (text and actions), messages after a sequence number, voice, `PUT /conversations/{id}/location` and `GET /orders/{id}`, with the customer-scoping tests (another customer's conversation or order is a 404)
 - [ ] Engine, pricing, parsing, voice, fallback, session and location tests pass; API smoke test from nearby to a placed order
 - [ ] Regenerate and commit `openapi/schema.yaml`, publish release `v0.2.0` and tell the frontend team
@@ -226,7 +226,7 @@ own pull request, and after each one the frontend is told the commit to pin:
 ## 15. Later (not started)
 
 - [ ] Speech benchmark on real recordings (with consent) and a choice of provider
-- [ ] Privacy policy and terms, subscription price and trade licence (business tasks for the owner)
+- [ ] Privacy policy and terms (drafts in `docs/legal/`: the owner fills the company details and a lawyer licensed in the UAE reviews them), subscription price and trade licence (business tasks for the owner)
 - [ ] Pilot MVP: statuses ready, delivered, can't find car, no-show and cancel, blocks and the platform-wide ban, location enforcement, cash or card choice
 - [ ] Platform admin tools: onboarding, QR codes, subscriptions, orders per restaurant per month
 - [ ] Paid always-on hosting, managed database with backups, monitoring

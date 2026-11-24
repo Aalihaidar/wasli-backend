@@ -203,13 +203,17 @@ class OrderingTurn:
             conversation=conversation,
         )
 
-    def _failed(self, error: AssistantError, unavailable: str) -> Reply:
-        """The bot's answer when the assistant could not be used for this input."""
+    def _went_down(self, error: AssistantError) -> bool:
+        """Whether the assistant cannot be used now: an outage (remembered for a few minutes) or
+        a used-up budget (nothing was sent). Any other failure is a badly formed answer."""
         if error.outcome in _OUTAGE:
             record_failure()
-            return self.reply(unavailable)
-        if error.outcome == Outcome.BUDGET_EXCEEDED:
-            # Nothing was sent: the day's budget is used up, so the picker is offered.
+            return True
+        return error.outcome == Outcome.BUDGET_EXCEEDED
+
+    def _failed(self, error: AssistantError, unavailable: str) -> Reply:
+        """The bot's answer when the assistant could not be used for this input."""
+        if self._went_down(error):
             return self.reply(unavailable)
         return self.reply("not_understood")
 

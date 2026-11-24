@@ -112,9 +112,30 @@ _TEXTS: dict[str, dict[str, str]] = {
         "en": "I did not catch a change. Tell me what to change.",
         "ar": "لم ألتقط أي تغيير. أخبرني ما الذي تريد تغييره.",
     },
-    "car_unavailable": {
-        "en": "I cannot read your answer right now. Please try again in a few minutes.",
-        "ar": "لا أستطيع قراءة إجابتك الآن. حاول مرة أخرى بعد بضع دقائق.",
+    "car_fallback_intro": {
+        "en": "I cannot read free answers right now, so I will ask you one thing at a time.",
+        "ar": "لا أستطيع قراءة الإجابات الحرة الآن، لذلك سأسألك عن شيء واحد في كل مرة.",
+    },
+    "car_voice_unavailable": {
+        "en": "I cannot understand voice messages right now. Please type your answer.",
+        "ar": "لا أستطيع فهم الرسائل الصوتية الآن. اكتب إجابتك من فضلك.",
+    },
+    "car_ask_parking_note": {
+        "en": (
+            "Where are you parked? Type the parking name and where your car is. The restaurant "
+            "may reject the order if it does not know where you are."
+        ),
+        "ar": (
+            "أين أوقفت سيارتك؟ اكتب اسم الموقف ومكان سيارتك. قد يرفض المطعم الطلب إذا لم يعرف مكانك."
+        ),
+    },
+    "car_ask_plate": {"en": "What is the car number?", "ar": "ما رقم السيارة؟"},
+    "car_ask_model": {"en": "What is the car model?", "ar": "ما موديل السيارة؟"},
+    "car_ask_colour": {"en": "What is the car colour?", "ar": "ما لون السيارة؟"},
+    "car_current": {"en": "Now: {value}", "ar": "الحالي: {value}"},
+    "car_invalid": {
+        "en": "That does not fit: {item} must be between {low} and {high} characters. Please try again.",
+        "ar": "هذه الإجابة غير مناسبة: يجب أن يكون {item} بين {low} و{high} حرفاً. حاول مرة أخرى.",
     },
     "car_label_parking_note": {
         "en": "where your car is (the parking name and the spot)",

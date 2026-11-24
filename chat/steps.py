@@ -17,7 +17,12 @@ from assistant.types import (
     ReplyField,
     ReplyIntent,
 )
-from orders.car import CAR_FIELDS, clean_car_field, missing_car_fields
+from orders.car import (
+    CAR_FIELDS,
+    car_field_limits,
+    clean_car_field,
+    missing_car_fields,
+)
 from orders.errors import OrderError, ProblemCode
 from orders.services import place_order
 
@@ -57,7 +62,10 @@ class Turn(OrderingTurn):
 
     def _car_prompt(self) -> Reply:
         """The car question: all of it the first time, only what is missing afterwards, and the
-        four current values when the customer is editing them from the review."""
+        four current values when the customer is editing them from the review. While the
+        assistant is down, or once the one-at-a-time questions have started, one item is asked."""
+        if self.conversation.pending_field or not ai_available():
+            return self._fallback_prompt()
         if self.conversation.return_to_review:
             values = "\n".join(
                 f"{self.say('car_value_' + field)}: {value}"
@@ -135,16 +143,19 @@ class Turn(OrderingTurn):
 
     # --- moving between the steps -------------------------------------------------------------
 
-    def to_car_question(self) -> list[Reply]:
+    def _enter_car(self, *, editing: bool) -> None:
+        """Open the car question afresh (any one-at-a-time questions start again)."""
         conversation = self.conversation
         conversation.state = ConversationState.ASK_CAR
-        conversation.return_to_review = False
+        conversation.return_to_review = editing
+        conversation.pending_field = ""
+
+    def to_car_question(self) -> list[Reply]:
+        self._enter_car(editing=False)
         return [self._car_prompt()]
 
     def begin_car_edit(self) -> list[Reply]:
-        conversation = self.conversation
-        conversation.state = ConversationState.ASK_CAR
-        conversation.return_to_review = True
+        self._enter_car(editing=True)
         return [self._car_prompt()]
 
     def to_note(self) -> list[Reply]:
@@ -199,8 +210,8 @@ class Turn(OrderingTurn):
     def _car_answer(self, message: MessageInput) -> list[Reply]:
         conversation = self.conversation
         editing = conversation.return_to_review
-        if not ai_available():
-            return [self.reply("car_unavailable")]
+        if conversation.pending_field or not ai_available():
+            return self._fallback_answer(message)
         asked = list(CAR_FIELDS if editing else missing_car_fields(self._car_values()))
         try:
             result = self.assistant.extract_car_details(
@@ -214,7 +225,9 @@ class Turn(OrderingTurn):
         except AssistantError as error:
             if isinstance(message, AudioInput) and error.code in UNREADABLE_AUDIO:
                 return [self.reply("could_not_hear")]
-            return [self._failed(error, "car_unavailable")]
+            if self._went_down(error):
+                return self._fallback_answer(message)
+            return [self.reply("not_understood")]
         if isinstance(message, AudioInput) and not self.hear(result.transcript):
             return [self.reply("could_not_hear")]
 
@@ -228,6 +241,68 @@ class Turn(OrderingTurn):
                 return [self.reply("car_no_change"), self._car_prompt()]
             return self.to_review()
         return self.to_note()
+
+    # --- the car, one item at a time (the assistant is down) -----------------------------------
+
+    def _ask_text(self, field: str) -> str:
+        """The question for one car item. When editing from the review, the current value is shown."""
+        text = self.say(f"car_ask_{field}")
+        current = getattr(self.conversation, _CAR_ATTRS[field])
+        if self.conversation.return_to_review and current:
+            text = f"{text}\n{self.say('car_current', value=current)}"
+        return text
+
+    def _fallback_prompt(self) -> Reply:
+        """The question for the item being asked. The first time it also says why, and starts at
+        the first item that is missing (all four when editing)."""
+        conversation = self.conversation
+        starting = not conversation.pending_field
+        if starting:
+            missing = missing_car_fields(self._car_values())
+            first = (
+                CAR_FIELDS[0]
+                if conversation.return_to_review or not missing
+                else missing[0]
+            )
+            conversation.pending_field = first
+        text = self._ask_text(conversation.pending_field)
+        if starting:
+            text = f"{self.say('car_fallback_intro')}\n{text}"
+        return Reply(text)
+
+    def _fallback_answer(self, message: MessageInput) -> list[Reply]:
+        """An answer to the car question while the assistant cannot read it. The typed text goes
+        straight into the item being asked, checked by the same rules as the order service; a
+        spoken one cannot be read. A message that arrives before the first question is not used
+        as an answer, because it may hold several items."""
+        conversation = self.conversation
+        starting = not conversation.pending_field
+        if isinstance(message, AudioInput):
+            return [self.reply("car_voice_unavailable"), self._fallback_prompt()]
+        if starting:
+            return [self._fallback_prompt()]
+        field = conversation.pending_field
+        cleaned = clean_car_field(field, message)
+        if cleaned is None:
+            low, high = car_field_limits(field)
+            hint = self.say(
+                "car_invalid", item=self.say(f"car_value_{field}"), low=low, high=high
+            )
+            return [Reply(f"{hint}\n{self._ask_text(field)}")]
+        setattr(conversation, _CAR_ATTRS[field], cleaned)
+
+        editing = conversation.return_to_review
+        if editing:
+            position = CAR_FIELDS.index(field) + 1
+            following = CAR_FIELDS[position] if position < len(CAR_FIELDS) else None
+        else:
+            missing = missing_car_fields(self._car_values())
+            following = missing[0] if missing else None
+        if following:
+            conversation.pending_field = following
+            return [Reply(self._ask_text(following))]
+        conversation.pending_field = ""
+        return self.to_review() if editing else self.to_note()
 
     # --- the note -----------------------------------------------------------------------------
 
@@ -303,7 +378,9 @@ class Turn(OrderingTurn):
             return self.begin_note_edit()
         if field == ReplyField.CAR.value:
             replies = self.begin_car_edit()
-            return self._car_answer(message) if message is not None else replies
+            if message is None or self.conversation.pending_field:
+                return replies
+            return self._car_answer(message)
         return [self._edit_prompt()]
 
     # --- placing the order --------------------------------------------------------------------
@@ -335,8 +412,7 @@ class Turn(OrderingTurn):
         if ProblemCode.OUTSIDE_SERVICE_DISTANCE in codes:
             return [self.reply("outside_service_distance"), *self.to_review()]
         if ProblemCode.CAR_DETAILS_INCOMPLETE in codes:
-            conversation.state = ConversationState.ASK_CAR
-            conversation.return_to_review = False
+            self._enter_car(editing=False)
             return [self._car_prompt()]
         # The order itself no longer stands: an item or option is gone, or it is empty.
         conversation.state = ConversationState.ORDERING
