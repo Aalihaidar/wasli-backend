@@ -57,9 +57,9 @@ The contract is [`openapi/schema.yaml`](openapi/schema.yaml), generated with
   `me/contact`, `me/contact/verify`, `password-reset`, `password-reset/confirm`).
 - The chat, with the customer token: `POST /restaurants/{slug}/conversations` (open the current
   conversation or a new one), `GET /conversations/{id}/messages?after_seq=` (polled) and
-  `POST /conversations/{id}/messages` (text, or a button: `confirm`, `edit`, `choose`,
-  `set_lines`, `set_locale`, `restart`) and `POST /conversations/{id}/voice` (one WAV clip, read
-  in memory and never stored), `PUT /conversations/{id}/location` (the phone's position) and
+  `POST /conversations/{id}/messages` (text, or a button: `confirm`, `edit`, `edit_field`,
+  `choose`, `skip_note`, `set_lines`, `set_locale`, `restart`) and `POST /conversations/{id}/voice`
+  (one WAV clip taken in every open step, read in memory and never stored), `PUT /conversations/{id}/location` (the phone's position) and
   `GET /orders/{id}` (the customer's own order). The chat now runs from the welcome to the placed order. The bot writes every message; the assistant only
   understands ([ADR 0019](docs/adr/0019-the-conversation-engine.md), providers in
   [`docs/groq-setup.md`](docs/groq-setup.md) and [`docs/gemini-setup.md`](docs/gemini-setup.md)).

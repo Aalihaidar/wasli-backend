@@ -173,8 +173,10 @@ class ConversationVoiceView(_ScopedPost):
             "stored with an empty transcript and the bot answers in the chat (the second also "
             "makes `ai_available` false for a few minutes). `400` codes: `audio_too_long`, "
             "`audio_too_large` (the clip above 5 MB, or the whole request above 6 MB) and "
-            "`unsupported_audio_format` (only WAV for now). Allowed while the conversation is "
-            "in `ordering`; elsewhere `409 invalid_action_for_state`."
+            "`unsupported_audio_format` (only WAV for now). Taken in every open step (the "
+            "order, the car, the note and the review); a placed conversation is `409 "
+            "invalid_action_for_state` and an expired one `409 conversation_expired`. A spoken "
+            "yes at the review places the order, so `403 phone_not_verified` is possible there."
         ),
         request={"multipart/form-data": VoiceMessageSerializer},
         responses={201: ChatSerializer},
