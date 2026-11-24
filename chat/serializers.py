@@ -21,8 +21,8 @@ from orders.models import Order
 from .audio import read_voice_upload
 from .models import Conversation, ConversationState, Message, MessageKind, Sender
 
-# The buttons and requests a customer can send. ``edit_field`` and ``skip_note`` belong to the
-# car and note steps and are refused (409) until those steps exist.
+# The buttons and requests a customer can send. A button sent in a step that does not take it
+# is refused with ``409 invalid_action_for_state`` (``chat/engine.py``, ``_ALLOWED_ACTIONS``).
 ACTIONS = [
     "confirm",
     "edit",
