@@ -541,4 +541,6 @@ class TestNestedMenu:
 
         [category] = api.get(self.url("cafe-a")).json()["menu"]
 
-        assert set(category) == {"id", "name_en", "name_ar", "items"}
+        # No `parent_id` for a top-level category; `image_url` is always there (null without a picture).
+        assert set(category) == {"id", "name_en", "name_ar", "image_url", "items"}
+        assert category["image_url"] is None
