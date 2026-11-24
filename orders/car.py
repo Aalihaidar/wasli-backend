@@ -20,6 +20,13 @@ _LENGTHS: Mapping[str, tuple[int, int]] = {
 }
 
 
+def car_field_limits(field: str) -> tuple[int, int]:
+    """The shortest and longest length (inclusive) a car field may have."""
+    if field not in _LENGTHS:
+        raise ValueError(f"Unknown car field: {field}")
+    return _LENGTHS[field]
+
+
 @dataclass(frozen=True)
 class CarDetails:
     parking_note: str

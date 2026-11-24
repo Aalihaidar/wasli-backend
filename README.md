@@ -12,7 +12,7 @@ the car through a chat with the restaurant.
 > the assistant adapters, the API hardening baseline and the committed API contract. Since then:
 > the order service and the text chat (D2: open a conversation, send a message, read messages,
 > the order summary, voice, the car question, the note, the review, the position and the placed
-> order). Next: the fallbacks without the assistant, then the staff endpoints (D3). The checklist is
+> order, and the car question one item at a time while the assistant is down). Next: the staff endpoints (D3). The checklist is
 > [`docs/steps.md`](docs/steps.md); the design is in
 > [`docs/project-overview.md`](docs/project-overview.md).
 
@@ -45,7 +45,7 @@ Application libraries and their exact versions are pinned in `pyproject.toml` an
 | `orders` | Orders, order lines and the status history |
 | `assistant` | The adapters to the understanding provider (Groq as the main one, Gemini as the second, a fake one for tests), the prompts, the key and quota counters and the log of calls |
 
-The staff endpoints (accept and reject) and the car fallbacks without the assistant are not built yet.
+The staff endpoints (accept and reject) are not built yet. The drafts of the privacy policy and the terms of use are in [`docs/legal/`](docs/legal/README.md).
 
 ## The API
 

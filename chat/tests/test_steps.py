@@ -220,7 +220,7 @@ class TestTheCarQuestion:
         assert response.json()["messages"][0]["transcript"] == ""
         assert response.json()["conversation"]["state"] == "ask_car"
 
-    def test_while_the_assistant_is_down_the_bot_says_so_and_changes_nothing(
+    def test_while_the_assistant_is_down_the_bot_asks_one_item_at_a_time(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         flow = at_car(monkeypatch)
@@ -229,9 +229,11 @@ class TestTheCarQuestion:
         response = say_text(flow.api, flow.cid, FULL_CAR)
 
         assert response.status_code == 201
-        assert "cannot read your answer right now" in bot_texts(response)[0]
+        assert "I cannot read free answers right now" in bot_texts(response)[0]
         assert response.json()["conversation"]["ai_available"] is False
         assert response.json()["conversation"]["state"] == "ask_car"
+        # The details are in tests/test_car_fallback.py; nothing was stored from the message.
+        assert _conversation(flow).vehicle_plate == ""
 
     def test_buttons_of_other_steps_are_refused(
         self, monkeypatch: pytest.MonkeyPatch

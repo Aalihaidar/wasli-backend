@@ -56,8 +56,29 @@ be exactly one transaction with the same guarantees as any other turn ([ADR 0019
 
 ## Consequences
 
-- While the assistant is down the car question cannot be read: the bot says it cannot read the answer right now (the buttons and
-  the item picker still work). The four questions asked one at a time are the fallback still to build.
+- While the assistant is down the car question cannot be read as one free answer, so the bot asks the four items one at a time
+  (see the addendum below). The buttons and the item picker still work.
 - A customer who edits the car by voice may cost three assistant calls in a turn (the clip classified, then read for the car);
   the budget and the per-key limits count them.
 - The review and the placed message are plain bot messages; the staff's answer (`result`) comes with the staff endpoints.
+
+## Addendum (2026-11-24): the car question one item at a time
+
+- **When it starts.** At the car question, or at an answer to it, when `ai_available()` is false (a recent outage or a used-up
+  budget), and when the assistant fails while reading an answer (the failure is recorded first, so the flag is false from then
+  on). A message that arrives before the first question is not used as an answer, because it may hold several items: the bot
+  explains ("I cannot read free answers right now, so I will ask you one thing at a time") and asks the first item.
+- **How it runs.** `Conversation.pending_field` holds the item being asked (`parking_note`, `plate`, `model`, `colour`; the column
+  existed since the models were built). The typed answer goes straight into that item, checked by `orders/car.py` with the same
+  rules as the order service; an answer that does not fit is asked again with its length limits. Without an edit, the next item
+  asked is the first one still missing (so what the assistant read earlier is kept); when editing from the review, all four are
+  asked in order, each showing its current value, and the review comes back at the end. When the four are valid the
+  conversation goes to the note, as before.
+- **It finishes once started.** A conversation with a `pending_field` stays in the one-at-a-time flow even if the assistant is
+  back, so the customer is never moved between two ways of answering in the middle. `restart` and a cancel clear it; a new
+  entry to the car question (the confirm, an edit from the review, or incomplete details at placing) starts it afresh.
+- **Voice.** A clip is not read in this flow: the bot says it cannot understand voice right now and repeats the question. The
+  clip never reaches the assistant.
+- **No contract change.** The state stays `ask_car`, no button is added, and every message is an ordinary bot `text`.
+- **Not done on purpose.** There is no "keep" button when editing (a new action would change the contract); the customer types
+  the value again, or the current one, for each item.
