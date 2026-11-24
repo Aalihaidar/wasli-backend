@@ -20,7 +20,8 @@ Arabic names, aliases, service distance and accounts. Never invent a menu: the r
    optional service distance in metres, the phone, the logo and an optional brand colour (`#RRGGBB`), optional welcome
    messages. Leave `is_demo` off for a real restaurant. The default subscription status `trial` is fine: only `suspended` hides a restaurant. Upload the
    menu images on the same page, with a caption and a sort order.
-2. **Menu** (Menu, Menu categories): one category per section, then its items on the same page, with the price **typed in
+2. **Menu** (Menu, Menu categories): one category per section, with an optional picture of the category (a subcategory and
+   a sub-subcategory have one too), then its items on the same page, with the price **typed in
    AED** (the admin stores fils), availability, an optional photo and the aliases. Sizes and extras are option groups on
    the item's page, with options that carry a price difference in AED (a default option fills a required group the
    customer did not mention).
@@ -129,7 +130,31 @@ Prepare every picture with **Squoosh** (see [Preparing a picture with Squoosh](#
 | **Logo** | map list, chat avatar, restaurant page | PNG (WebP is also fine), never SVG | **512 × 512 px**, square | under about 100 KB | Keep the artwork centred with a margin: it is shown in a circle. A transparent or plain background is fine. At least 256 × 256 px |
 | **Menu images** | sent in the chat; the customer opens them full width and pinches to zoom | JPEG or WebP | **1,600 px on the long side at most**, and **about 1,000 px at least** | **300 KB or less** each | One image per menu page or section, in the order you want (sort order). Shoot flat and straight in good light so the text is readable zoomed. Convert iPhone HEIC photos to JPEG. A smaller picture is kept at its size, never enlarged |
 | **Item photo** (optional) | the item picker | JPEG or WebP | **800 × 800 px**, square | under about 100 KB | Skip it when there is no good photo |
+| **Category picture** (optional; also for a subcategory and a sub-subcategory) | shown with the category in the menu | JPEG or WebP | **800 × 800 px**, square | under about 100 KB | The same rules as an item photo |
 | **Cover** | not used by the API yet | | | | Leave it empty |
+
+### Where the files are stored
+
+You do not choose a folder: the backend places every upload in the restaurant's own folder of the media bucket, named after the
+restaurant's slug and the English names, all in lowercase kebab case ([ADR 0023](adr/0023-image-folders-follow-the-admin.md)).
+For a restaurant `gulf-food`:
+
+```text
+restaurants/gulf-food/logo/logo.png
+restaurants/gulf-food/cover/cover.jpg
+restaurants/gulf-food/menu-images/<caption>.jpg
+restaurants/gulf-food/menu/burgers.webp                      the picture of the category "Burgers"
+restaurants/gulf-food/menu/burgers/chicken-burger.webp       an item of Burgers
+restaurants/gulf-food/menu/burgers/spicy.webp                the picture of the subcategory "Spicy"
+restaurants/gulf-food/menu/burgers/spicy/hot-wings.webp      an item of Spicy
+```
+
+A name with no English letters falls back to `item` or `category`. A new upload never replaces a file: when a name is taken the
+storage adds a short suffix (`logo_k3j9d2.png`). **The folders follow the admin by themselves:** when you rename a restaurant
+(its slug), a category, an item or a menu image caption, or move a category under another one, the backend moves the affected
+files right after you save (a category with many items takes a few seconds). If a move cannot finish (the storage is down), the
+files stay where they were and nothing is lost; run `python manage.py organize_media --dry-run` and then
+`python manage.py organize_media` to bring everything back in line.
 
 ### Preparing a picture with Squoosh
 

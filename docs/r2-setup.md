@@ -18,8 +18,11 @@ The Cloudflare account may hold other projects, so every Wasli bucket and key is
 - Another app uses its own bucket, so its images never reach Wasli's bucket and a Wasli key cannot touch another app.
 - Never use an account-wide or "Admin" key for the backend.
 - Production values are never put in a developer's `.env`: local development uses the staging bucket, like the database.
-- Inside a bucket the code keeps order itself: `restaurants/logos/`, `restaurants/covers/`, `restaurants/menu/`,
-  `menu/items/` and `chat/messages/`.
+- Inside a bucket the code keeps order itself: one folder per restaurant, named after its slug, laid out like the admin
+  (`restaurants/<slug>/logo/`, `cover/`, `menu-images/` and `menu/<category>/<subcategory>/...`, with lowercase kebab-case
+  names; [ADR 0023](adr/0023-image-folders-follow-the-admin.md)). `python manage.py organize_media --dry-run` moves files
+  uploaded before that layout and repairs a move that could not finish; run it without `--dry-run` once the plan looks right. A
+  rename in the admin moves the files by itself.
 - Staging status (2026-11-10): the staging bucket exists with public access and its CORS rule, and its keys are set in the
   local `.env` and on the staging Render service. The production bucket is created at launch.
 

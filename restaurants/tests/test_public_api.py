@@ -341,6 +341,21 @@ class TestDetail:
 
         assert api.get(self.url("cafe-a")).json()["service_radius_m"] == 300
 
+    def test_a_category_has_an_optional_picture_like_an_item(
+        self, api: APIClient
+    ) -> None:
+        restaurant = make_restaurant("cafe-pic")
+        pictured = make_category(restaurant, "Burgers", image="menu/burgers.webp")
+        make_category(restaurant, "Drinks")
+        make_item(pictured, "Chicken burger")
+
+        body = api.get(self.url("cafe-pic")).json()
+
+        burgers, drinks = body["menu"]
+        assert burgers["image_url"].startswith("http")
+        assert burgers["image_url"].endswith("menu/burgers.webp")
+        assert drinks["image_url"] is None
+
     def test_another_restaurants_menu_never_leaks_in(self, api: APIClient) -> None:
         a, b = make_restaurant("cafe-a"), make_restaurant("cafe-b")
         make_item(make_category(a), "Only at A")
@@ -526,4 +541,6 @@ class TestNestedMenu:
 
         [category] = api.get(self.url("cafe-a")).json()["menu"]
 
-        assert set(category) == {"id", "name_en", "name_ar", "items"}
+        # No `parent_id` for a top-level category; `image_url` is always there (null without a picture).
+        assert set(category) == {"id", "name_en", "name_ar", "image_url", "items"}
+        assert category["image_url"] is None

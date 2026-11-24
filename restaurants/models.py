@@ -6,6 +6,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, RegexVa
 from django.db import models, transaction
 
 from core.locales import ARABIC_OPTIONAL_HELP, ArabicFallbackMixin, arabic_or_english
+from core.media_paths import IMAGE_NAME_LENGTH, cover_path, logo_path, menu_image_path
 from core.models import BaseModel
 from core.money import CURRENCY
 from core.permissions import Role
@@ -43,8 +44,12 @@ class Restaurant(ArabicFallbackMixin, BaseModel):
     # Empty means the default welcome text of the conversation engine.
     welcome_message_en = models.TextField(blank=True)
     welcome_message_ar = models.TextField(blank=True)
-    logo = models.ImageField(upload_to="restaurants/logos/", blank=True)
-    cover = models.ImageField(upload_to="restaurants/covers/", blank=True)
+    logo = models.ImageField(
+        upload_to=logo_path, max_length=IMAGE_NAME_LENGTH, blank=True
+    )
+    cover = models.ImageField(
+        upload_to=cover_path, max_length=IMAGE_NAME_LENGTH, blank=True
+    )
     brand_colour = models.CharField(
         max_length=7, blank=True, validators=[_colour_validator]
     )
@@ -110,7 +115,7 @@ class Restaurant(ArabicFallbackMixin, BaseModel):
 class RestaurantMenuImage(RestaurantOwnedModel):
     """A picture of the menu that the bot sends in the chat."""
 
-    image = models.ImageField(upload_to="restaurants/menu/")
+    image = models.ImageField(upload_to=menu_image_path, max_length=IMAGE_NAME_LENGTH)
     caption_en = models.CharField(max_length=150, blank=True)
     caption_ar = models.CharField(
         max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
