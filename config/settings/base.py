@@ -299,6 +299,9 @@ REST_FRAMEWORK: dict[str, object] = {
         # The chat: opening a conversation, and every message or button tap in it.
         "chat_open": "30/hour",
         "chat_message": "40/min",
+        # Staff sign-in, per client address; the password change, per account.
+        "staff_login": "10/min",
+        "staff_password": "10/hour",
     },
 }
 DRF_STANDARDIZED_ERRORS = {
@@ -352,6 +355,8 @@ SPECTACULAR_SETTINGS = {
         "ConversationStateEnum": "chat.models.ConversationState.choices",
         "OrderTypeEnum": "core.order_types.OrderType.choices",
         "OrderStatusEnum": "orders.models.OrderStatus.choices",
+        "StaffRoleEnum": "restaurants.models.ROLE_CHOICES",
+        "StaffPermissionEnum": "core.permissions.PERMISSION_CHOICES",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
     # The package's hook names the error-code enums; ours then makes them extensible, because the

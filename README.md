@@ -37,7 +37,7 @@ Application libraries and their exact versions are pinned in `pyproject.toml` an
 | --- | --- |
 | `users` | The one account table: sign-in with a username, an email or a phone number |
 | `core` | Shared base model, money and distance helpers, permission codes, restaurant scoping, the public `config` endpoint |
-| `restaurants` | Restaurants (with an optional service distance), menu images and staff memberships (roles `admin` and `cashier`), the public restaurant endpoints |
+| `restaurants` | Restaurants (with an optional service distance), menu images and staff memberships (roles `admin` and `cashier`), the public restaurant endpoints, the staff sign-in and the member's own profile |
 | `menu` | Categories, items, option groups and options |
 | `customers` | Customers, their sessions and cars, restaurant blocks, the customer token authentication, sign-up with a verification code, sign-in and password reset |
 | `messaging` | The outbox of emails and SMS (shown in the admin on local and staging, refused in production) and the delivery interface |
@@ -45,7 +45,7 @@ Application libraries and their exact versions are pinned in `pyproject.toml` an
 | `orders` | Orders, order lines and the status history |
 | `assistant` | The adapters to the understanding provider (Groq as the main one, Gemini as the second, a fake one for tests), the prompts, the key and quota counters and the log of calls |
 
-The staff endpoints (accept and reject) are not built yet. The drafts of the privacy policy and the terms of use are in [`docs/legal/`](docs/legal/README.md).
+The staff order endpoints (the orders list, accept and reject) are not built yet. The drafts of the privacy policy and the terms of use are in [`docs/legal/`](docs/legal/README.md).
 
 ## The API
 
@@ -63,6 +63,9 @@ The contract is [`openapi/schema.yaml`](openapi/schema.yaml), generated with
   `GET /orders/{id}` (the customer's own order). The chat now runs from the welcome to the placed order. The bot writes every message; the assistant only
   understands ([ADR 0019](docs/adr/0019-the-conversation-engine.md), providers in
   [`docs/groq-setup.md`](docs/groq-setup.md) and [`docs/gemini-setup.md`](docs/gemini-setup.md)).
+- The staff sign-in, for the restaurant app: `POST /auth/login` (a token only for an active member of a restaurant),
+  `POST /auth/logout`, `POST /auth/password` (the temporary password) and `GET /staff/me`, with the staff token
+  (`Authorization: Token <token>`; [ADR 0024](docs/adr/0024-the-staff-sign-in.md)).
 
 On local and staging, staff signed in through the admin can open Swagger UI at `/api/docs/`;
 production serves nothing there. The two Flutter repositories pin the contract by commit until

@@ -189,7 +189,7 @@ own pull request, and after each one the frontend is told the commit to pin:
 
 ## 12. D3: the restaurant side (show it to restaurant managers after this)
 
-- [ ] Staff endpoints: login (restaurant accounts use a username), logout and `GET /staff/me`
+- [x] Staff endpoints: login (restaurant accounts use a username), logout, `GET /staff/me` and `POST /auth/password` (the temporary password), [ADR 0024](adr/0024-the-staff-sign-in.md); the request is #94, agreed with the restaurant app
 - [ ] `GET /staff/orders?since=` (returns `server_time`, marks the screen online) with both-language item names, distance and distance band
 - [ ] Order state machine in `orders/services.py` (accept with 5, 10 or 15 minutes, reject with every reason and a required note for `other`, every other transition a 409), each transition writing an `OrderEvent`
 - [ ] Accept and reject endpoints that post the `result` message into the customer's chat

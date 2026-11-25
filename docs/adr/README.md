@@ -32,6 +32,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0021](0021-voice-is-read-in-memory-and-never-stored.md) | A voice clip is read in memory and never stored: the voice endpoint, WAV only for now, and what happens when it cannot be understood | accepted, built |
 | [0022](0022-the-car-the-note-the-review-and-placing.md) | The car, the note, the review and placing the order: merge-only answers, the review edit paths, the phone check as a rolled-back 403, the position and the customer's order; addendum: the car question one item at a time while the assistant is down | accepted, built |
 | [0023](0023-image-folders-follow-the-admin.md) | Uploaded images go to one folder per restaurant laid out like the admin, in lowercase kebab case, with a picture for every menu category level | accepted, built |
+| [0024](0024-the-staff-sign-in.md) | The staff sign-in: a token only for an active member, one token per account, a refusal that never says which accounts exist, the temporary password and `GET /staff/me` | accepted, built |
 
 ## Writing a record
 

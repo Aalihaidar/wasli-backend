@@ -24,6 +24,9 @@ class Role(StrEnum):
     CASHIER = "cashier"
 
 
+# The permission codes as choices, for the API schema (a list that grows: ``StaffPermissionEnum``).
+PERMISSION_CHOICES = [(permission.value, permission.value) for permission in Permission]
+
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.ADMIN: frozenset(Permission),
     Role.CASHIER: frozenset({Permission.ORDERS_VIEW, Permission.ORDERS_DECIDE}),
