@@ -265,7 +265,7 @@ Rules that apply to every table:
 | --- | --- |
 | `users` | The one account table (`User`): username, email, phone, password |
 | `core` | Base model, restaurant scoping, permission codes and checks, money and distance helpers |
-| `restaurants` | Restaurants (with an optional service distance), menu images, staff memberships |
+| `restaurants` | Restaurants (with an optional service distance), menu images, staff memberships, the staff sign-in |
 | `menu` | Categories, items, option groups, options |
 | `customers` | Customer profiles, sessions and their authentication, vehicles, blocks, sign-up, sign-in, password reset and the verification codes |
 | `messaging` | The outbox (emails and SMS shown in the admin on staging), the delivery interface and its backends |

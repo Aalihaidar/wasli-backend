@@ -35,6 +35,26 @@ class HasRestaurantPermission(BasePermission):  # type: ignore[misc]
         return True
 
 
+class IsStaffMember(BasePermission):  # type: ignore[misc]
+    """Lets a request through when the caller is an active member of a restaurant, whatever
+    the role. For the calls every member needs (their own profile and their own password).
+
+    A caller without a token is turned away by the authentication class (401); a signed-in
+    account without an active membership (for example a member deactivated after signing in)
+    is a 403 here. The membership is kept on the request: read it with ``get_membership``.
+    """
+
+    def has_permission(self, request: Request, view: Any) -> bool:
+        user = request.user
+        if user is None or not user.is_authenticated:
+            return False
+        membership = resolve_membership(user)
+        if membership is None:
+            return False
+        request.staff_membership = membership
+        return True
+
+
 def require_permission(permission: Permission) -> type[HasRestaurantPermission]:
     """A permission class for one code: ``permission_classes = [require_permission(...)]``."""
     return type(

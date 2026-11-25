@@ -140,3 +140,26 @@ class TestTheGeneratedContract:
         assert schemas["OrderTypeEnum"]["x-extensible-enum"][0] == "car"
         for name in ("MessageKindEnum", "ConversationStateEnum", "OrderTypeEnum"):
             assert "enum" not in schemas[name]
+
+    def test_the_staff_lists_are_extensible(self, schemas: dict[str, Any]) -> None:
+        assert set(schemas["StaffRoleEnum"]["x-extensible-enum"]) == {
+            "admin",
+            "cashier",
+        }
+        assert {"orders.view", "orders.decide"} <= set(
+            schemas["StaffPermissionEnum"]["x-extensible-enum"]
+        )
+        for name in ("StaffRoleEnum", "StaffPermissionEnum"):
+            assert "enum" not in schemas[name]
+
+    def test_the_staff_me_reference_to_the_restaurant_is_a_bare_reference(
+        self, schemas: dict[str, Any]
+    ) -> None:
+        """No `allOf` around a nested object (the generated clients read it badly), and the
+        service distance is an optional property, never a nullable one."""
+        me = schemas["StaffMe"]["properties"]
+        restaurant = schemas["StaffRestaurant"]
+
+        assert me["restaurant"] == {"$ref": "#/components/schemas/StaffRestaurant"}
+        assert "service_radius_m" not in restaurant["required"]
+        assert "nullable" not in restaurant["properties"]["service_radius_m"]

@@ -5,6 +5,240 @@ info:
   description: 'The HTTP API of Wasli: order from the car through a chat with the
     restaurant.'
 paths:
+  /api/v1/auth/login:
+    post:
+      operationId: staff_login
+      description: 'Signs in a member of a restaurant with the account''s username
+        (an email address or a phone number also works) and the password, and returns
+        the staff token. A wrong username or password, an inactive account and an
+        account that is not an active member of a restaurant (a customer, the platform
+        team) are all the same `401 authentication_failed`, and no token is created
+        for them. The token belongs to the account, not to the device: signing in
+        again returns the same token and signing out ends it everywhere. Ten tries
+        a minute per address and ten wrong tries per username in 15 minutes.'
+      summary: Sign a staff member in
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffLoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffLoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffLoginRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error400Response'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error409Response'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error429Response'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffToken'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: ''
+  /api/v1/auth/logout:
+    post:
+      operationId: staff_logout
+      description: Deletes the staff token. Because the token belongs to the account,
+        every device of that account is signed out.
+      summary: Sign a staff member out
+      tags:
+      - auth
+      security:
+      - tokenAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error400Response'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error409Response'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error429Response'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: ''
+        '204':
+          description: No response body
+  /api/v1/auth/password:
+    post:
+      operationId: staff_password_change
+      description: 'Replaces the password of the signed-in member and clears `must_change_password`.
+        The token stays valid. The new password follows the same strength rules as
+        the admin and must differ from the current one: a wrong current password is
+        a `400` on `current_password` (`password_incorrect`), a weak or unchanged
+        new one is a `400` on `new_password` (`password_too_short`, `password_too_common`,
+        `password_entirely_numeric`, `password_too_similar`, `password_unchanged`).
+        Ten tries an hour. Every other staff call keeps working while `must_change_password`
+        is true.'
+      summary: Change the password
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffPasswordRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffPasswordRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffPasswordRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error400Response'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error403Response'
+              examples:
+                PermissionDenied:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: permission_denied
+                      detail: You do not have permission to perform this action.
+                      attr: null
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error409Response'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error429Response'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: ''
+        '204':
+          description: No response body
   /api/v1/config:
     get:
       operationId: config_retrieve
@@ -1524,6 +1758,87 @@ paths:
               schema:
                 $ref: '#/components/schemas/NearbyResponse'
           description: ''
+  /api/v1/staff/me:
+    get:
+      operationId: staff_me
+      description: The member, their role and permission codes, whether they must
+        change the password, and the restaurant they work for (name, logo, position
+        and the optional `service_radius_m`, absent when the restaurant sets none).
+        `403 permission_denied` means the account is not an active member of a restaurant
+        any more.
+      summary: Read the signed-in member
+      tags:
+      - staff
+      security:
+      - tokenAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error400Response'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error403Response'
+              examples:
+                PermissionDenied:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: permission_denied
+                      detail: You do not have permission to perform this action.
+                      attr: null
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error409Response'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error429Response'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMe'
+          description: ''
 components:
   schemas:
     ActionEnum:
@@ -2782,6 +3097,145 @@ components:
       description: |-
         * `gps` - gps
         * `simulated` - simulated
+    StaffLoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: The account's username. An email address or a phone number
+            also works.
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+      required:
+      - password
+      - username
+    StaffMe:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        full_name:
+          type: string
+        role:
+          allOf:
+          - $ref: '#/components/schemas/StaffRoleEnum'
+          description: |-
+            The member's role at this restaurant. A list that can grow.
+
+            * `admin` - Admin
+            * `cashier` - Cashier
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffPermissionEnum'
+          description: What the member may do. Hide an action the list does not allow;
+            the server stays the authority.
+        must_change_password:
+          type: boolean
+          description: 'True for a new member with a temporary password: ask for a
+            new one with `POST /auth/password`.'
+        restaurant:
+          $ref: '#/components/schemas/StaffRestaurant'
+      required:
+      - full_name
+      - id
+      - must_change_password
+      - permissions
+      - restaurant
+      - role
+      - username
+    StaffPasswordRequest:
+      type: object
+      properties:
+        current_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+      required:
+      - current_password
+      - new_password
+    StaffPermissionEnum:
+      type: string
+      description: |-
+        * `orders.view` - orders.view
+        * `orders.decide` - orders.decide
+        * `menu.edit` - menu.edit
+        * `members.manage` - members.manage
+        * `restaurant.settings` - restaurant.settings
+        * `reports.view` - reports.view
+      x-extensible-enum:
+      - orders.view
+      - orders.decide
+      - menu.edit
+      - members.manage
+      - restaurant.settings
+      - reports.view
+    StaffRestaurant:
+      type: object
+      properties:
+        slug:
+          type: string
+        name_en:
+          type: string
+        name_ar:
+          type: string
+          description: The Arabic name, or the English name when there is no Arabic
+            one.
+        logo_url:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        service_radius_m:
+          type: integer
+          description: Metres from the restaurant that it serves cars. Absent when
+            the restaurant sets no limit.
+        currency:
+          type: string
+      required:
+      - currency
+      - latitude
+      - logo_url
+      - longitude
+      - name_ar
+      - name_en
+      - slug
+    StaffRoleEnum:
+      type: string
+      description: |-
+        * `admin` - Admin
+        * `cashier` - Cashier
+      x-extensible-enum:
+      - admin
+      - cashier
+    StaffToken:
+      type: object
+      properties:
+        token:
+          type: string
+          description: 'Send it as `Authorization: Token <token>` on every staff call.'
+      required:
+      - token
     VerifyRequest:
       type: object
       properties:
@@ -2824,3 +3278,8 @@ components:
       name: Authorization
       description: Customer token, sent as `Customer <token>`. It is returned once,
         when a sign-up is verified or a customer signs in.
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"

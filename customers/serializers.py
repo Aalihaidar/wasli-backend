@@ -9,8 +9,9 @@ from core.locales import Locale
 from messaging.models import Channel
 from users.identifiers import normalize_email, normalize_phone
 from users.models import User
+from users.passwords import check_password_strength
 
-from .accounts import CODE_EXPIRES_IN, RESEND_IN, check_password_strength, contact_of
+from .accounts import CODE_EXPIRES_IN, RESEND_IN, contact_of
 from .models import Customer
 
 # Plain English labels, so the contract carries no Arabic script (the model's own choices do).

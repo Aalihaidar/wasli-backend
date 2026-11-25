@@ -16,7 +16,14 @@ ERROR_CODE_LIST = re.compile(r"ErrorCode\d{3}Enum")
 # Other lists the product will add values to (a new kind of message, a new step of the
 # conversation, a new way to serve an order): the apps treat a value they do not know as unknown.
 EXTENSIBLE_LISTS = frozenset(
-    {"MessageKindEnum", "ConversationStateEnum", "OrderTypeEnum", "OrderStatusEnum"}
+    {
+        "MessageKindEnum",
+        "ConversationStateEnum",
+        "OrderTypeEnum",
+        "OrderStatusEnum",
+        "StaffRoleEnum",
+        "StaffPermissionEnum",
+    }
 )
 
 
