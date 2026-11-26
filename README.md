@@ -12,7 +12,7 @@ the car through a chat with the restaurant.
 > the assistant adapters, the API hardening baseline and the committed API contract. Since then:
 > the order service and the text chat (D2: open a conversation, send a message, read messages,
 > the order summary, voice, the car question, the note, the review, the position and the placed
-> order, and the car question one item at a time while the assistant is down). Next: the staff endpoints (D3). The checklist is
+> order, and the car question one item at a time while the assistant is down). Then the first staff endpoints (D3: the sign-in, the orders list, accept and reject with the answer posted in the chat). Next: throttling and the D3 checks. The checklist is
 > [`docs/steps.md`](docs/steps.md); the design is in
 > [`docs/project-overview.md`](docs/project-overview.md).
 
@@ -45,7 +45,7 @@ Application libraries and their exact versions are pinned in `pyproject.toml` an
 | `orders` | Orders, order lines and the status history, the restaurant's answer (accept or reject) and the staff orders list |
 | `assistant` | The adapters to the understanding provider (Groq as the main one, Gemini as the second, a fake one for tests), the prompts, the key and quota counters and the log of calls |
 
-The staff accept and reject endpoints are not built yet. The drafts of the privacy policy and the terms of use are in [`docs/legal/`](docs/legal/README.md).
+The drafts of the privacy policy and the terms of use are in [`docs/legal/`](docs/legal/README.md).
 
 ## The API
 
@@ -68,6 +68,9 @@ The contract is [`openapi/schema.yaml`](openapi/schema.yaml), generated with
   (`Authorization: Token <token>`; [ADR 0024](docs/adr/0024-the-staff-sign-in.md)).
 - The restaurant screen's list: `GET /staff/orders?since=` (polled, needs `orders.view`; returns `server_time` and the orders
   created or changed after `since`, and marks the screen online; [ADR 0025](docs/adr/0025-the-order-state-machine-and-the-staff-orders-list.md)).
+- The restaurant's answer: `POST /staff/orders/{id}/accept` (5, 10 or 15 minutes) and `POST /staff/orders/{id}/reject` (a reason and
+  a note, required for `other`), needing `orders.decide`; each posts a `result` message into the customer's chat
+  ([ADR 0026](docs/adr/0026-the-staff-decision-endpoints-and-the-result-message.md)).
 
 On local and staging, staff signed in through the admin can open Swagger UI at `/api/docs/`;
 production serves nothing there. The two Flutter repositories pin the contract by commit until

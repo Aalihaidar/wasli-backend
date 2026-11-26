@@ -8,7 +8,8 @@ does all of it in one transaction.
 
 ``accept_order`` and ``reject_order`` are the state machine of the restaurant's side: a placed
 order is answered once, every other transition is a ``409 order_invalid_transition``, and each
-change writes an ``OrderEvent``. ``orders_changed_since`` is the restaurant screen's polling
+change writes an ``OrderEvent`` and posts the ``result`` message into the customer's chat, all in
+one transaction. ``orders_changed_since`` is the restaurant screen's polling
 list.
 """
 
@@ -23,6 +24,7 @@ from rest_framework.exceptions import APIException, NotFound, ValidationError
 from rest_framework.fields import ErrorDetail
 
 from chat.models import Conversation, ConversationState
+from chat.result import post_order_result
 from core.geo import haversine_m
 from core.order_types import SUPPORTED_ORDER_TYPES
 from customers.models import Vehicle
@@ -258,6 +260,7 @@ def accept_order(
         order.accepted_at = timezone.now()
         order.save(update_fields=["status", "eta_minutes", "accepted_at", "updated_at"])
         _record(order, OrderStatus.ACCEPTED, actor)
+        post_order_result(order)
     return order
 
 
@@ -300,6 +303,7 @@ def reject_order(
             ]
         )
         _record(order, OrderStatus.REJECTED, actor)
+        post_order_result(order)
     return order
 
 

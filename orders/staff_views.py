@@ -1,4 +1,6 @@
-"""The restaurant screen's orders (``/api/v1/staff/orders``). Accept and reject come next."""
+"""The restaurant screen's orders (``/api/v1/staff/orders``): the polling list, accept and reject."""
+
+from uuid import UUID
 
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -11,10 +13,13 @@ from core.permissions import Permission
 from restaurants.permissions import get_membership, require_permission
 from restaurants.services import mark_screen_online
 
-from .services import orders_changed_since
+from .services import accept_order, orders_changed_since, reject_order
 from .staff_serializers import (
+    StaffAcceptSerializer,
     StaffOrderListSerializer,
+    StaffOrderSerializer,
     StaffOrdersQuerySerializer,
+    StaffRejectSerializer,
 )
 
 
@@ -59,3 +64,73 @@ class StaffOrderListView(APIView):  # type: ignore[misc]
         ).data
         mark_screen_online(restaurant, now)
         return Response(body)
+
+
+class StaffOrderAcceptView(APIView):  # type: ignore[misc]
+    permission_classes = [  # noqa: RUF012
+        IsAuthenticated,
+        require_permission(Permission.ORDERS_DECIDE),
+    ]
+
+    @extend_schema(
+        operation_id="staff_orders_accept",
+        tags=["staff"],
+        summary="Accept an order",
+        description=(
+            "Accepts a placed order of the member's restaurant and promises a wait of 5, 10 or "
+            "15 minutes (`400 invalid_choice` on `eta_minutes` for any other value). The answer "
+            "is posted into the customer's chat as a `result` message in the same step. An "
+            "order that is not waiting for an answer any more (another screen answered it, or "
+            "it was answered before) is `409 order_invalid_transition`: poll the list to see "
+            "its real state. An order of another restaurant, or an unknown id, is `404`. "
+            "Answers with the updated order. Needs `orders.decide`."
+        ),
+        request=StaffAcceptSerializer,
+        responses={200: StaffOrderSerializer},
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        serializer = StaffAcceptSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = get_membership(request)
+        order = accept_order(
+            order_id=id,
+            restaurant=membership.restaurant,
+            actor=membership.user,
+            eta_minutes=serializer.validated_data["eta_minutes"],
+        )
+        return Response(StaffOrderSerializer(order, context={"request": request}).data)
+
+
+class StaffOrderRejectView(APIView):  # type: ignore[misc]
+    permission_classes = [  # noqa: RUF012
+        IsAuthenticated,
+        require_permission(Permission.ORDERS_DECIDE),
+    ]
+
+    @extend_schema(
+        operation_id="staff_orders_reject",
+        tags=["staff"],
+        summary="Reject an order",
+        description=(
+            "Rejects a placed order of the member's restaurant with a reason and an optional "
+            "note of at most 200 characters; the note is required for `other` (`400 required` "
+            "on `note`). The answer is posted into the customer's chat as a `result` message "
+            "in the same step. An order that is not waiting for an answer any more is `409 "
+            "order_invalid_transition`; an order of another restaurant, or an unknown id, is "
+            "`404`. Answers with the updated order. Needs `orders.decide`."
+        ),
+        request=StaffRejectSerializer,
+        responses={200: StaffOrderSerializer},
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        serializer = StaffRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = get_membership(request)
+        order = reject_order(
+            order_id=id,
+            restaurant=membership.restaurant,
+            actor=membership.user,
+            reason_code=serializer.validated_data["reason_code"],
+            note=serializer.validated_data.get("note", ""),
+        )
+        return Response(StaffOrderSerializer(order, context={"request": request}).data)

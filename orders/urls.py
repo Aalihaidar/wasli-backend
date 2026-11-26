@@ -9,4 +9,14 @@ urlpatterns = [
         staff_views.StaffOrderListView.as_view(),
         name="staff-orders",
     ),
+    path(
+        "staff/orders/<uuid:id>/accept",
+        staff_views.StaffOrderAcceptView.as_view(),
+        name="staff-orders-accept",
+    ),
+    path(
+        "staff/orders/<uuid:id>/reject",
+        staff_views.StaffOrderRejectView.as_view(),
+        name="staff-orders-reject",
+    ),
 ]

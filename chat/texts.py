@@ -176,6 +176,39 @@ _TEXTS: dict[str, dict[str, str]] = {
         "en": "Your order #{number} was sent. Waiting for the restaurant to confirm.",
         "ar": "تم إرسال طلبك رقم {number}. بانتظار تأكيد المطعم.",
     },
+    # The restaurant's answer, posted into the chat as the `result` message.
+    "result_accepted": {
+        "en": "Good news: your order #{number} was accepted. It will be ready in about {minutes} minutes.",
+        "ar": "أخبار سارة: تم قبول طلبك رقم {number}. سيكون جاهزاً خلال {minutes} دقيقة تقريباً.",
+    },
+    "result_rejected": {
+        "en": "Sorry, the restaurant could not accept your order #{number}. {reason}",
+        "ar": "عذراً، لم يتمكن المطعم من قبول طلبك رقم {number}. {reason}",
+    },
+    "reject_item_unavailable": {
+        "en": "Part of the order is finished or unavailable.",
+        "ar": "جزء من الطلب انتهى أو غير متوفر.",
+    },
+    "reject_too_busy": {
+        "en": "The restaurant is too busy right now.",
+        "ar": "المطعم مشغول جداً الآن.",
+    },
+    "reject_closing_soon": {
+        "en": "The restaurant is closing soon.",
+        "ar": "المطعم سيغلق قريباً.",
+    },
+    "reject_too_far": {
+        "en": "You are too far from the restaurant.",
+        "ar": "أنت بعيد جداً عن المطعم.",
+    },
+    "reject_location_unclear": {
+        "en": "The restaurant could not tell where you are.",
+        "ar": "لم يتمكن المطعم من تحديد مكانك.",
+    },
+    "reject_other": {
+        "en": "The restaurant says:",
+        "ar": "يقول المطعم:",
+    },
     "outside_service_distance": {
         "en": "Sorry, you seem to be outside the area this restaurant serves. Please move closer and send the order again.",
         "ar": "عذراً، يبدو أنك خارج المنطقة التي يخدمها هذا المطعم. اقترب وأرسل الطلب مرة أخرى.",
