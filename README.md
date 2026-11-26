@@ -42,10 +42,10 @@ Application libraries and their exact versions are pinned in `pyproject.toml` an
 | `customers` | Customers, their sessions and cars, restaurant blocks, the customer token authentication, sign-up with a verification code, sign-in and password reset |
 | `messaging` | The outbox of emails and SMS (shown in the admin on local and staging, refused in production) and the delivery interface |
 | `chat` | Conversations and messages |
-| `orders` | Orders, order lines and the status history |
+| `orders` | Orders, order lines and the status history, the restaurant's answer (accept or reject) and the staff orders list |
 | `assistant` | The adapters to the understanding provider (Groq as the main one, Gemini as the second, a fake one for tests), the prompts, the key and quota counters and the log of calls |
 
-The staff order endpoints (the orders list, accept and reject) are not built yet. The drafts of the privacy policy and the terms of use are in [`docs/legal/`](docs/legal/README.md).
+The staff accept and reject endpoints are not built yet. The drafts of the privacy policy and the terms of use are in [`docs/legal/`](docs/legal/README.md).
 
 ## The API
 
@@ -66,6 +66,8 @@ The contract is [`openapi/schema.yaml`](openapi/schema.yaml), generated with
 - The staff sign-in, for the restaurant app: `POST /auth/login` (a token only for an active member of a restaurant),
   `POST /auth/logout`, `POST /auth/password` (the temporary password) and `GET /staff/me`, with the staff token
   (`Authorization: Token <token>`; [ADR 0024](docs/adr/0024-the-staff-sign-in.md)).
+- The restaurant screen's list: `GET /staff/orders?since=` (polled, needs `orders.view`; returns `server_time` and the orders
+  created or changed after `since`, and marks the screen online; [ADR 0025](docs/adr/0025-the-order-state-machine-and-the-staff-orders-list.md)).
 
 On local and staging, staff signed in through the admin can open Swagger UI at `/api/docs/`;
 production serves nothing there. The two Flutter repositories pin the contract by commit until

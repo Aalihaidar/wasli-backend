@@ -31,6 +31,16 @@ def resolve_membership(
     return found[0] if len(found) == 1 else None
 
 
+def mark_screen_online(restaurant: Restaurant, now: datetime | None = None) -> None:
+    """Record that the restaurant's screen polled just now, so customers see it as open.
+
+    One column is written with ``update()``: no ``updated_at``, no signals, and nothing else
+    on the restaurant is touched, because this runs every few seconds."""
+    Restaurant.objects.filter(pk=restaurant.pk).update(
+        screen_last_seen_at=now or timezone.now()
+    )
+
+
 def public_restaurants() -> QuerySet[Restaurant]:
     """The restaurants a customer can see: active ones whose subscription is not suspended.
 

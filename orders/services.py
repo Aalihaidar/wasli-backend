@@ -1,14 +1,26 @@
-"""Placing an order: the one place an ``Order`` is created.
+"""Placing an order, and the restaurant's answer to it.
 
-The conversation engine calls ``place_order`` when the customer confirms the final review. It
-checks everything again from the database (the assistant and the app are never trusted), takes
-the next order number under a lock, copies the lines, the car, the note and the position into
-the order so later changes never rewrite it, and does all of it in one transaction.
+``place_order`` is the one place an ``Order`` is created. The conversation engine calls it when
+the customer confirms the final review. It checks everything again from the database (the
+assistant and the app are never trusted), takes the next order number under a lock, copies the
+lines, the car, the note and the position into the order so later changes never rewrite it, and
+does all of it in one transaction.
+
+``accept_order`` and ``reject_order`` are the state machine of the restaurant's side: a placed
+order is answered once, every other transition is a ``409 order_invalid_transition``, and each
+change writes an ``OrderEvent``. ``orders_changed_since`` is the restaurant screen's polling
+list.
 """
+
+from datetime import datetime, timedelta
+from uuid import UUID
 
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.exceptions import APIException, NotFound, ValidationError
+from rest_framework.fields import ErrorDetail
 
 from chat.models import Conversation, ConversationState
 from core.geo import haversine_m
@@ -16,10 +28,20 @@ from core.order_types import SUPPORTED_ORDER_TYPES
 from customers.models import Vehicle
 from customers.services import ensure_phone_verified_for_order
 from restaurants.models import Restaurant
+from users.models import User
 
 from .car import CAR_FIELDS, clean_car_details, missing_car_fields
 from .errors import OrderError, OrderProblem, ProblemCode
-from .models import ActorType, Order, OrderEvent, OrderItem, OrderStatus
+from .models import (
+    ETA_CHOICES,
+    MAX_REJECTION_NOTE,
+    ActorType,
+    Order,
+    OrderEvent,
+    OrderItem,
+    OrderStatus,
+    RejectionReason,
+)
 from .pricing import price_lines
 
 
@@ -169,4 +191,139 @@ def _remember_vehicle(
             "make_model": model,
             "last_used_at": timezone.now(),
         },
+    )
+
+
+# --- the restaurant's answer ---------------------------------------------------------------
+
+
+class OrderInvalidTransition(APIException):  # type: ignore[misc]
+    """The order is not waiting for an answer any more (another screen answered it first, or
+    the customer cancelled): the screen refetches the order and shows its real state."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "order_invalid_transition"
+    default_detail = "The order is no longer waiting for an answer."
+
+
+def _field_error(field: str, message: str, code: str) -> ValidationError:
+    return ValidationError({field: [ErrorDetail(message, code)]})
+
+
+def _lock_placed_order(order_id: UUID, restaurant: Restaurant) -> Order:
+    """The restaurant's own order, locked, when it is still waiting for an answer.
+
+    An order of another restaurant is a 404, never a 403: the answer must not confirm that it
+    exists. Two screens answering together are serialised by the lock, and the second one
+    finds the order already answered."""
+    try:
+        order = (
+            Order.objects.for_restaurant(restaurant)
+            .select_for_update()
+            .get(pk=order_id)
+        )
+    except Order.DoesNotExist:
+        raise NotFound from None
+    if order.status != OrderStatus.PLACED:
+        raise OrderInvalidTransition
+    return order
+
+
+def _record(order: Order, to_status: str, actor: User) -> None:
+    OrderEvent.objects.create(
+        restaurant=order.restaurant,
+        order=order,
+        from_status=OrderStatus.PLACED,
+        to_status=to_status,
+        actor_type=ActorType.STAFF,
+        actor_id=actor.pk,
+    )
+
+
+def accept_order(
+    *, order_id: UUID, restaurant: Restaurant, actor: User, eta_minutes: int
+) -> Order:
+    """The restaurant accepts a placed order and promises 5, 10 or 15 minutes.
+
+    ``updated_at`` moves with the change (the screens find the order by it), so the fields are
+    saved with ``save(update_fields=...)`` and never with ``update()``."""
+    if eta_minutes not in {minutes for minutes, _ in ETA_CHOICES}:
+        raise _field_error(
+            "eta_minutes", "Choose 5, 10 or 15 minutes.", "invalid_choice"
+        )
+    with transaction.atomic():
+        order = _lock_placed_order(order_id, restaurant)
+        order.status = OrderStatus.ACCEPTED
+        order.eta_minutes = eta_minutes
+        order.accepted_at = timezone.now()
+        order.save(update_fields=["status", "eta_minutes", "accepted_at", "updated_at"])
+        _record(order, OrderStatus.ACCEPTED, actor)
+    return order
+
+
+def reject_order(
+    *,
+    order_id: UUID,
+    restaurant: Restaurant,
+    actor: User,
+    reason_code: str,
+    note: str = "",
+) -> Order:
+    """The restaurant rejects a placed order with one of the six reasons. The note is optional
+    (at most 200 characters) and required for ``other``."""
+    if reason_code not in RejectionReason.values:
+        raise _field_error("reason_code", "This reason is not known.", "invalid_choice")
+    note = note.strip()
+    if len(note) > MAX_REJECTION_NOTE:
+        raise _field_error(
+            "note",
+            f"Use at most {MAX_REJECTION_NOTE} characters.",
+            "max_length",
+        )
+    if reason_code == RejectionReason.OTHER and not note:
+        raise _field_error(
+            "note", "Say why: a note is required for the reason other.", "required"
+        )
+    with transaction.atomic():
+        order = _lock_placed_order(order_id, restaurant)
+        order.status = OrderStatus.REJECTED
+        order.rejection_reason_code = reason_code
+        order.rejection_note = note
+        order.rejected_at = timezone.now()
+        order.save(
+            update_fields=[
+                "status",
+                "rejection_reason_code",
+                "rejection_note",
+                "rejected_at",
+                "updated_at",
+            ]
+        )
+        _record(order, OrderStatus.REJECTED, actor)
+    return order
+
+
+# --- the restaurant screen's list ----------------------------------------------------------
+
+# The screen sends back the ``server_time`` of its last answer. A change is saved a moment before
+# it is committed, so a change that commits just after that time could carry an ``updated_at``
+# slightly earlier than it: the list reads from a few seconds before ``since`` so such a change is
+# never missed. An order can therefore come twice with the same ``updated_at``; the app merges
+# by id and keeps the latest.
+CHANGE_OVERLAP = timedelta(seconds=10)
+DEFAULT_LOOKBACK = timedelta(hours=24)
+
+
+def orders_changed_since(
+    restaurant: Restaurant, since: datetime | None, now: datetime
+) -> list[Order]:
+    """The restaurant's orders created or changed after ``since`` (by default in the last 24
+    hours), newest first, with their lines. Only that restaurant's rows are ever read."""
+    start = (since if since is not None else now - DEFAULT_LOOKBACK) - CHANGE_OVERLAP
+    return list(
+        Order.objects.for_restaurant(restaurant)
+        .filter(updated_at__gt=start)
+        .select_related("restaurant")
+        .prefetch_related("items")
+        .order_by("-placed_at", "-number")
     )

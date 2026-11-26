@@ -22,6 +22,10 @@ class DistanceBand(StrEnum):
     UNKNOWN = "unknown"
 
 
+# The bands as choices, for the API schema (a list that can grow: ``DistanceBandEnum``).
+DISTANCE_BAND_CHOICES = [(band.value, band.value) for band in DistanceBand]
+
+
 class LocationSource(StrEnum):
     """Where a customer's position came from: the phone's GPS, a position the app made up
     for testing on staging, or none because the customer did not share it."""

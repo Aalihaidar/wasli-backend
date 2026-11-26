@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, ClassVar
 
 from django.core.exceptions import ValidationError
@@ -172,6 +173,11 @@ class Order(RestaurantOwnedModel):
 
     def __str__(self) -> str:
         return f"#{self.number} {self.restaurant}"
+
+    @property
+    def decided_at(self) -> datetime | None:
+        """When the restaurant accepted or rejected the order; ``None`` while it is placed."""
+        return self.accepted_at or self.rejected_at
 
     @property
     def distance_band(self) -> DistanceBand:

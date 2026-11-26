@@ -163,3 +163,48 @@ class TestTheGeneratedContract:
         assert me["restaurant"] == {"$ref": "#/components/schemas/StaffRestaurant"}
         assert "service_radius_m" not in restaurant["required"]
         assert "nullable" not in restaurant["properties"]["service_radius_m"]
+
+    def test_the_staff_order_declares_its_lists_and_optional_parts(
+        self, schemas: dict[str, Any]
+    ) -> None:
+        order = schemas["StaffOrder"]
+        properties = order["properties"]
+
+        # Optional properties are absent, never null, and nested objects are bare references.
+        for name in ("vehicle", "parking_note", "customer_location"):
+            assert name not in order["required"]
+        assert properties["vehicle"] == {"$ref": "#/components/schemas/StaffVehicle"}
+        assert properties["customer_location"] == {
+            "$ref": "#/components/schemas/StaffLocation"
+        }
+        # The reason is an inline nullable string with an extensible list: no $ref, no allOf.
+        reason = properties["rejection_reason_code"]
+        assert "$ref" not in reason and "allOf" not in reason
+        assert reason["type"] == "string" and reason["nullable"] is True
+        assert reason["x-extensible-enum"] == [
+            "item_unavailable",
+            "too_busy",
+            "closing_soon",
+            "too_far",
+            "location_unclear",
+            "other",
+        ]
+        # Fields that are empty until the restaurant answers are required and nullable.
+        for name in ("eta_minutes", "decided_at", "rejection_note", "distance_m"):
+            assert name in order["required"]
+            assert properties[name]["nullable"] is True
+        assert "x-extensible-enum" in schemas["DistanceBandEnum"]
+        assert "enum" not in schemas["DistanceBandEnum"]
+        location_source = schemas["StaffLocation"]["properties"]["source"]
+        assert location_source["x-extensible-enum"] == ["gps", "simulated", "none"]
+        assert "$ref" not in location_source
+
+    def test_the_customer_position_request_keeps_its_own_closed_list(
+        self, schemas: dict[str, Any]
+    ) -> None:
+        """The staff location source is declared in place so that it never merges with the
+        customer's request, whose list is closed and has no ``none``."""
+        source = schemas["LocationRequest"]["properties"]["source"]
+
+        assert source["allOf"] == [{"$ref": "#/components/schemas/SourceEnum"}]
+        assert schemas["SourceEnum"]["enum"] == ["gps", "simulated"]

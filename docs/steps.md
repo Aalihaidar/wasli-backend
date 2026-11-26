@@ -190,8 +190,8 @@ own pull request, and after each one the frontend is told the commit to pin:
 ## 12. D3: the restaurant side (show it to restaurant managers after this)
 
 - [x] Staff endpoints: login (restaurant accounts use a username), logout, `GET /staff/me` and `POST /auth/password` (the temporary password), [ADR 0024](adr/0024-the-staff-sign-in.md); the request is #94, agreed with the restaurant app
-- [ ] `GET /staff/orders?since=` (returns `server_time`, marks the screen online) with both-language item names, distance and distance band
-- [ ] Order state machine in `orders/services.py` (accept with 5, 10 or 15 minutes, reject with every reason and a required note for `other`, every other transition a 409), each transition writing an `OrderEvent`
+- [x] `GET /staff/orders?since=` (returns `server_time`, marks the screen online) with both-language item names, distance and distance band ([ADR 0025](adr/0025-the-order-state-machine-and-the-staff-orders-list.md))
+- [x] Order state machine in `orders/services.py` (accept with 5, 10 or 15 minutes, reject with every reason and a required note for `other`, every other transition a 409), each transition writing an `OrderEvent` (the service is built; the endpoints that call it are the next item)
 - [ ] Accept and reject endpoints that post the `result` message into the customer's chat
 - [ ] Daily request budget guard for the assistant layer and the assistant flag in `/config`
 - [ ] Throttling on every open endpoint, stricter on messages, voice and session creation

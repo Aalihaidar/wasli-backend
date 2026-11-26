@@ -23,6 +23,7 @@ EXTENSIBLE_LISTS = frozenset(
         "OrderStatusEnum",
         "StaffRoleEnum",
         "StaffPermissionEnum",
+        "DistanceBandEnum",
     }
 )
 

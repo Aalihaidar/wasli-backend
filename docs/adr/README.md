@@ -33,6 +33,7 @@ explain **why** the code is the way it is, so a new developer or the frontend te
 | [0022](0022-the-car-the-note-the-review-and-placing.md) | The car, the note, the review and placing the order: merge-only answers, the review edit paths, the phone check as a rolled-back 403, the position and the customer's order; addendum: the car question one item at a time while the assistant is down | accepted, built |
 | [0023](0023-image-folders-follow-the-admin.md) | Uploaded images go to one folder per restaurant laid out like the admin, in lowercase kebab case, with a picture for every menu category level | accepted, built |
 | [0024](0024-the-staff-sign-in.md) | The staff sign-in: a token only for an active member, one token per account, a refusal that never says which accounts exist, the temporary password and `GET /staff/me` | accepted, built |
+| [0025](0025-the-order-state-machine-and-the-staff-orders-list.md) | The restaurant's answer to an order (accept or reject once, `409` otherwise, `updated_at` on every change) and the staff polling list with its overlap, the screen marked online and one `StaffOrder` shape | accepted, built (the endpoints and the result message come next) |
 
 ## Writing a record
 
