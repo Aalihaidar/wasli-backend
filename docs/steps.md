@@ -193,8 +193,8 @@ own pull request, and after each one the frontend is told the commit to pin:
 - [x] `GET /staff/orders?since=` (returns `server_time`, marks the screen online) with both-language item names, distance and distance band ([ADR 0025](adr/0025-the-order-state-machine-and-the-staff-orders-list.md))
 - [x] Order state machine in `orders/services.py` (accept with 5, 10 or 15 minutes, reject with every reason and a required note for `other`, every other transition a 409), each transition writing an `OrderEvent`
 - [x] `POST /staff/orders/{id}/accept` and `/reject`, each posting the `result` message into the customer's chat in the same transaction ([ADR 0026](adr/0026-the-staff-decision-endpoints-and-the-result-message.md))
-- [ ] Daily request budget guard for the assistant layer and the assistant flag in `/config`
-- [ ] Throttling on every open endpoint, stricter on messages, voice and session creation
+- [x] Daily request budget guard for the assistant layer and the assistant flag in `/config` (built with the assistant layer in D2: see the `assistant` items above)
+- [x] Throttling on every open endpoint, stricter on messages, voice and session creation (the defaults cover every view, and `core/tests/test_endpoint_sweep.py` fails when a route has no throttle, when a staff route answers without a staff token or to a customer's token, or when a staff route that names an order does not answer `404` to a member of another restaurant)
 - [x] State-machine and tenancy tests pass (`orders/tests/test_state_machine.py`, `test_staff_orders_api.py`, `test_staff_decision_api.py`)
 - [ ] Regenerate and commit `openapi/schema.yaml`, publish release `v0.3.0` and tell the frontend team
 - [ ] **D3 done:** the full flow works with both deployed sites on staging, the tenancy test passes and reject works with every reason; show it to restaurant managers
