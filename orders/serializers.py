@@ -2,9 +2,10 @@
 
 from typing import Any
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import Order
+from .models import Order, RejectionReason
 
 
 class BlankAsNullCharField(serializers.CharField):  # type: ignore[misc]
@@ -14,20 +15,32 @@ class BlankAsNullCharField(serializers.CharField):  # type: ignore[misc]
         return super().to_representation(value) if value else None
 
 
+REASON_CODES_HELP = (
+    "Why the restaurant rejected the order, else null. A list that can grow: treat a code you "
+    "do not know as unknown."
+)
+
+
+@extend_schema_field(
+    {
+        "type": "string",
+        "nullable": True,
+        "x-extensible-enum": list(RejectionReason.values),
+        "description": REASON_CODES_HELP,
+    }
+)
+class RejectionReasonField(BlankAsNullCharField):
+    """The rejection reason as an inline nullable string: a named enum with a nullable wrapper
+    is read badly by the generated Dart client, so the list is declared in place."""
+
+
 class OrderSerializer(serializers.ModelSerializer):  # type: ignore[misc]
     eta_minutes = serializers.IntegerField(
         read_only=True,
         allow_null=True,
         help_text="The wait the restaurant gave when it accepted (5, 10 or 15), else null.",
     )
-    rejection_reason_code = BlankAsNullCharField(
-        read_only=True,
-        allow_null=True,
-        help_text=(
-            "Why the restaurant rejected the order: `item_unavailable`, `too_busy`, "
-            "`closing_soon`, `too_far`, `location_unclear` or `other`; null otherwise."
-        ),
-    )
+    rejection_reason_code = RejectionReasonField(read_only=True, allow_null=True)
     rejection_note = BlankAsNullCharField(
         read_only=True,
         allow_null=True,

@@ -15,26 +15,8 @@ from rest_framework import serializers
 from core.geo import DISTANCE_BAND_CHOICES, LocationSource
 from core.order_types import OrderType
 
-from .models import Order, OrderStatus, RejectionReason
-from .serializers import BlankAsNullCharField
-
-REASON_CODES_HELP = (
-    "Why the restaurant rejected the order, else null. A list that can grow: treat a code you "
-    "do not know as unknown."
-)
-
-
-@extend_schema_field(
-    {
-        "type": "string",
-        "nullable": True,
-        "x-extensible-enum": list(RejectionReason.values),
-        "description": REASON_CODES_HELP,
-    }
-)
-class RejectionReasonField(BlankAsNullCharField):
-    """The rejection reason as an inline nullable string: a named enum with a nullable wrapper
-    is read badly by the generated Dart client, so the list is declared in place."""
+from .models import MAX_REJECTION_NOTE, Order, OrderStatus, RejectionReason
+from .serializers import BlankAsNullCharField, RejectionReasonField
 
 
 @extend_schema_field(
@@ -191,3 +173,36 @@ class StaffOrderListSerializer(serializers.Serializer):  # type: ignore[misc]
         help_text="Send it back as `since` on the next call."
     )
     orders = StaffOrderSerializer(many=True)
+
+
+class StaffAcceptSerializer(serializers.Serializer):  # type: ignore[misc]
+    eta_minutes = serializers.IntegerField(
+        help_text="The wait the restaurant promises, in minutes: 5, 10 or 15."
+    )
+
+
+@extend_schema_field(
+    {
+        "type": "string",
+        "x-extensible-enum": list(RejectionReason.values),
+        "description": (
+            "Why the restaurant rejects the order: `item_unavailable`, `too_busy`, "
+            "`closing_soon`, `too_far`, `location_unclear` or `other`."
+        ),
+    }
+)
+class RejectionReasonInput(serializers.CharField):  # type: ignore[misc]
+    """The reason in a request, declared in place like the one in the answer."""
+
+
+class StaffRejectSerializer(serializers.Serializer):  # type: ignore[misc]
+    reason_code = RejectionReasonInput()
+    note = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=MAX_REJECTION_NOTE,
+        help_text=(
+            f"A note for the customer, at most {MAX_REJECTION_NOTE} characters. Required "
+            "when the reason is `other`."
+        ),
+    )
