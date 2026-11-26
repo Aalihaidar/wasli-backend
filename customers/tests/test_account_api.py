@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from django.utils import timezone
+from drf_spectacular.generators import SchemaGenerator
 from rest_framework.test import APIClient
 from rest_framework.throttling import ScopedRateThrottle
 
@@ -561,6 +562,35 @@ class TestLogin:
         )
 
         assert known.json() == unknown.json()
+
+    @pytest.mark.parametrize("missing", ["identifier", "password"])
+    def test_a_blank_field_is_a_400_that_names_it(
+        self, api: APIClient, missing: str
+    ) -> None:
+        body = {"identifier": EMAIL, "password": PASSWORD, missing: ""}
+
+        response = api.post(LOGIN, body, format="json")
+
+        assert response.status_code == 400
+        assert first_error(response)["attr"] == missing
+
+    def test_the_contract_declares_the_refusals_of_a_sign_in(self) -> None:
+        # drf-spectacular is only partly typed
+        schema = SchemaGenerator().get_schema(request=None, public=True)  # type: ignore[no-untyped-call]
+        responses = schema["paths"]["/api/v1/customers/login"]["post"]["responses"]
+
+        examples = {
+            code: responses[code]["content"]["application/json"]["examples"]
+            for code in ("401", "403")
+        }
+        assert {"401", "403", "429"} <= set(responses)
+        assert (
+            examples["401"]["WrongPasswordOrUnknownContact"]["value"]["errors"][0][
+                "code"
+            ]
+            == "authentication_failed"
+        )
+        assert {"AccountNotVerified", "BlockedOrDeactivated"} <= set(examples["403"])
 
     def test_an_unverified_account_cannot_sign_in(self, api: APIClient) -> None:
         sign_up(api)
