@@ -7,13 +7,15 @@ themselves are in ``customers.accounts``.
 
 from typing import Any
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiExample, extend_schema
+from drf_standardized_errors.openapi_serializers import ErrorResponse401Serializer
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from config.api_errors import Error403ResponseSerializer
 from core.views import PublicAPIView
 
 from . import accounts
@@ -148,11 +150,67 @@ class LoginView(PublicCustomerView):
         summary="Sign in",
         description=(
             "Signs a customer in with an email address or a phone number and the password, and "
-            "returns the customer token. `account_not_verified` until the sign-up code is verified "
-            "(the app opens the code screen). Ten tries per contact in 15 minutes."
+            "returns the customer token. A wrong password and a contact with no account are the "
+            "same `401 authentication_failed`, so the answer never says whether an account exists. "
+            "Only a caller who gives the right password learns more: `403 account_not_verified` "
+            "until the sign-up code is verified (the app opens the code screen), and `403 "
+            "permission_denied` for a blocked or deactivated account. A missing or blank "
+            "`identifier` or `password` is a `400` that names the field in `attr`. Ten tries per "
+            "contact in 15 minutes (`429 throttled`)."
         ),
         request=LoginSerializer,
-        responses={200: SessionSerializer},
+        responses={
+            200: SessionSerializer,
+            401: ErrorResponse401Serializer,
+            403: Error403ResponseSerializer,
+        },
+        examples=[
+            OpenApiExample(
+                "WrongPasswordOrUnknownContact",
+                value={
+                    "type": "client_error",
+                    "errors": [
+                        {
+                            "code": "authentication_failed",
+                            "detail": "The contact or the password is not correct.",
+                            "attr": None,
+                        }
+                    ],
+                },
+                response_only=True,
+                status_codes=["401"],
+            ),
+            OpenApiExample(
+                "AccountNotVerified",
+                value={
+                    "type": "client_error",
+                    "errors": [
+                        {
+                            "code": "account_not_verified",
+                            "detail": "Verify the code sent to your contact before signing in.",
+                            "attr": None,
+                        }
+                    ],
+                },
+                response_only=True,
+                status_codes=["403"],
+            ),
+            OpenApiExample(
+                "BlockedOrDeactivated",
+                value={
+                    "type": "client_error",
+                    "errors": [
+                        {
+                            "code": "permission_denied",
+                            "detail": "You do not have permission to perform this action.",
+                            "attr": None,
+                        }
+                    ],
+                },
+                response_only=True,
+                status_codes=["403"],
+            ),
+        ],
     )
     def post(self, request: Request) -> Response:
         serializer = LoginSerializer(data=request.data)
