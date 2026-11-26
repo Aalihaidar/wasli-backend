@@ -79,7 +79,10 @@ Every other list is paginated.
 
 Every view is throttled by default: 60 requests a minute per client address when anonymous and 240 a minute
 per account when signed in (`DEFAULT_THROTTLE_RATES`). A stricter limit for one endpoint (sending messages,
-voice) is set on its view. Counts live in each worker's memory, so the limits are approximate. A throttled
+voice, the sign-ins) is set on its view with a `throttle_scope`. A sweep over every route (`core/tests/test_endpoint_sweep.py`)
+fails when a route has no throttle, and also checks the staff routes: no token is a `401`, a customer's token is refused, and a
+member of another restaurant gets a `404` on an order that is not theirs. A new staff route that names an order must add its valid
+body to that test. Counts live in each worker's memory, so the limits are approximate. A throttled
 request gets `429` with the code `throttled`.
 
 ## Timestamps
