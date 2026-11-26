@@ -70,8 +70,10 @@ with a default page size of 20 and a maximum of 100, and the envelope `count`, `
 
 **Exception: the polling lists.** Three lists are read by the sites every few seconds and keep their own
 shapes instead of the envelope: `GET /restaurants/nearby`, `GET /conversations/{id}/messages?after_seq=`
-and `GET /staff/orders?since=`. They return everything newer than the cursor the client sends. Every other
-list is paginated.
+and `GET /staff/orders?since=`. They return everything newer than the cursor the client sends. The staff list reads from a
+few seconds before `since` so a change that commits late is never missed, which means an order can arrive again unchanged: the
+app merges by `id` and keeps the latest `updated_at` ([ADR 0025](adr/0025-the-order-state-machine-and-the-staff-orders-list.md)).
+Every other list is paginated.
 
 ## Throttling
 

@@ -1839,6 +1839,100 @@ paths:
               schema:
                 $ref: '#/components/schemas/StaffMe'
           description: ''
+  /api/v1/staff/orders:
+    get:
+      operationId: staff_orders_list
+      description: 'The signed-in member''s restaurant''s orders created or changed
+        after `since` (by default in the last 24 hours), newest first, each with its
+        lines in both languages, the car, the optional position (`customer_location`,
+        absent when the customer did not share it), `distance_m` and `distance_band`.
+        Send the `server_time` of the answer back as `since` on the next call; the
+        server reads from a few seconds before it, so a change is never missed and
+        an order can arrive again unchanged: merge by `id` and keep the one with the
+        latest `updated_at`. Every successful call marks the restaurant''s screen
+        online for customers (they see it as open while it polled in the last 60 seconds).
+        This list is polled and is not paginated. Needs `orders.view`.'
+      summary: List the restaurant's orders that are new or changed
+      parameters:
+      - in: query
+        name: since
+        schema:
+          type: string
+          format: date-time
+        description: The `server_time` of the previous answer. Without it, the orders
+          created or changed in the last 24 hours.
+      tags:
+      - staff
+      security:
+      - tokenAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error400Response'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse401'
+              examples:
+                AuthenticationFailed:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: authentication_failed
+                      detail: Incorrect authentication credentials.
+                      attr: null
+                NotAuthenticated:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: not_authenticated
+                      detail: Authentication credentials were not provided.
+                      attr: null
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error403Response'
+              examples:
+                PermissionDenied:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: permission_denied
+                      detail: You do not have permission to perform this action.
+                      attr: null
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error409Response'
+          description: ''
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error429Response'
+              examples:
+                Throttled:
+                  value:
+                    type: client_error
+                    errors:
+                    - code: throttled
+                      detail: Request was throttled.
+                      attr: null
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffOrderList'
+          description: ''
 components:
   schemas:
     ActionEnum:
@@ -2065,6 +2159,18 @@ components:
       - locale
       - phone
       - phone_verified
+    DistanceBandEnum:
+      type: string
+      description: |-
+        * `in_lot` - in_lot
+        * `near` - near
+        * `far` - far
+        * `unknown` - unknown
+      x-extensible-enum:
+      - in_lot
+      - near
+      - far
+      - unknown
     Error400:
       type: object
       properties:
@@ -3097,6 +3203,38 @@ components:
       description: |-
         * `gps` - gps
         * `simulated` - simulated
+    StaffLocation:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        accuracy_m:
+          type: number
+          format: double
+          nullable: true
+          description: How accurate the position is, in metres, when the phone said.
+        source:
+          type: string
+          x-extensible-enum:
+          - gps
+          - simulated
+          - none
+          description: '`gps`, or `simulated` for the test button on staging. A list
+            that can grow: treat a value you do not know as unknown.'
+        captured_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - accuracy_m
+      - captured_at
+      - lat
+      - lng
+      - source
     StaffLoginRequest:
       type: object
       properties:
@@ -3152,6 +3290,169 @@ components:
       - restaurant
       - role
       - username
+    StaffOrder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: integer
+          description: The restaurant's own order number.
+        status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        order_type:
+          $ref: '#/components/schemas/OrderTypeEnum'
+        placed_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          description: 'Moves on every change to the order. Merge by `id` and keep
+            the latest: an order can arrive again unchanged, with the same value.'
+        decided_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the order was accepted or rejected; null while it is placed.
+        eta_minutes:
+          type: integer
+          nullable: true
+          description: The wait the restaurant gave when it accepted (5, 10 or 15),
+            else null.
+        rejection_reason_code:
+          type: string
+          nullable: true
+          x-extensible-enum:
+          - item_unavailable
+          - too_busy
+          - closing_soon
+          - too_far
+          - location_unclear
+          - other
+          description: 'Why the restaurant rejected the order, else null. A list that
+            can grow: treat a code you do not know as unknown.'
+        rejection_note:
+          type: string
+          nullable: true
+          description: The restaurant's note with a rejection (always there for `other`),
+            else null.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffOrderItem'
+        customer_note:
+          type: string
+          description: The customer's note for the whole order, or empty.
+        subtotal_minor:
+          type: integer
+        total_minor:
+          type: integer
+        currency:
+          type: string
+        vehicle:
+          $ref: '#/components/schemas/StaffVehicle'
+        parking_note:
+          type: string
+          description: Where the car is, as the customer said it. Present for a car
+            order.
+        customer_location:
+          $ref: '#/components/schemas/StaffLocation'
+        distance_m:
+          type: integer
+          nullable: true
+          description: Metres from the customer to the restaurant; null without a
+            position.
+        distance_band:
+          allOf:
+          - $ref: '#/components/schemas/DistanceBandEnum'
+          description: |-
+            `in_lot` within the restaurant's service distance, `near`, `far`, or `unknown` without a position. A list that can grow.
+
+            * `in_lot` - in_lot
+            * `near` - near
+            * `far` - far
+            * `unknown` - unknown
+      required:
+      - currency
+      - customer_note
+      - decided_at
+      - distance_band
+      - distance_m
+      - eta_minutes
+      - id
+      - items
+      - number
+      - order_type
+      - placed_at
+      - rejection_note
+      - rejection_reason_code
+      - status
+      - subtotal_minor
+      - total_minor
+      - updated_at
+    StaffOrderItem:
+      type: object
+      properties:
+        line:
+          type: integer
+          description: The line's number in the order, from 1.
+        name_en:
+          type: string
+        name_ar:
+          type: string
+        quantity:
+          type: integer
+        unit_price_minor:
+          type: integer
+          description: The item's price with its options, in fils.
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffOrderOption'
+        note:
+          type: string
+          description: The customer's note on the line, or empty.
+        line_total_minor:
+          type: integer
+      required:
+      - line
+      - line_total_minor
+      - name_ar
+      - name_en
+      - note
+      - options
+      - quantity
+      - unit_price_minor
+    StaffOrderList:
+      type: object
+      properties:
+        server_time:
+          type: string
+          format: date-time
+          description: Send it back as `since` on the next call.
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffOrder'
+      required:
+      - orders
+      - server_time
+    StaffOrderOption:
+      type: object
+      properties:
+        name_en:
+          type: string
+        name_ar:
+          type: string
+        price_delta_minor:
+          type: integer
+          description: The change to the item's price, in fils.
+      required:
+      - name_ar
+      - name_en
+      - price_delta_minor
     StaffPasswordRequest:
       type: object
       properties:
@@ -3236,6 +3537,19 @@ components:
           description: 'Send it as `Authorization: Token <token>` on every staff call.'
       required:
       - token
+    StaffVehicle:
+      type: object
+      properties:
+        plate:
+          type: string
+        model:
+          type: string
+        colour:
+          type: string
+      required:
+      - colour
+      - model
+      - plate
     VerifyRequest:
       type: object
       properties:

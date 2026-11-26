@@ -270,7 +270,7 @@ Rules that apply to every table:
 | `customers` | Customer profiles, sessions and their authentication, vehicles, blocks, sign-up, sign-in, password reset and the verification codes |
 | `messaging` | The outbox (emails and SMS shown in the admin on staging), the delivery interface and its backends |
 | `chat` | Conversations, messages, the conversation engine and every bot text in Arabic and English |
-| `orders` | Orders, order items, order events, pricing, order creation and status changes |
+| `orders` | Orders, order items, order events, pricing, order creation, the restaurant's answer and the staff orders list |
 | `assistant` | The adapters to the understanding provider (Groq as the main one, Gemini as the second, a fake one in tests), prompts, key and quota counters, call log |
 
 Working rules:

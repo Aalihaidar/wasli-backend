@@ -357,6 +357,7 @@ SPECTACULAR_SETTINGS = {
         "OrderStatusEnum": "orders.models.OrderStatus.choices",
         "StaffRoleEnum": "restaurants.models.ROLE_CHOICES",
         "StaffPermissionEnum": "core.permissions.PERMISSION_CHOICES",
+        "DistanceBandEnum": "core.geo.DISTANCE_BAND_CHOICES",
     },
     # Replaces drf-spectacular's own enum hook (the package's hook calls the same logic).
     # The package's hook names the error-code enums; ours then makes them extensible, because the
