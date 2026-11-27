@@ -195,6 +195,7 @@ class TestShape:
                 "placed_at": body["orders"][0]["placed_at"],
                 "updated_at": body["orders"][0]["updated_at"],
                 "decided_at": None,
+                "ready_at": None,
                 "eta_minutes": None,
                 "rejection_reason_code": None,
                 "rejection_note": None,

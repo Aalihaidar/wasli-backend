@@ -71,6 +71,8 @@ The contract is [`openapi/schema.yaml`](openapi/schema.yaml), generated with
 - The restaurant's answer: `POST /staff/orders/{id}/accept` (5, 10 or 15 minutes) and `POST /staff/orders/{id}/reject` (a reason and
   a note, required for `other`), needing `orders.decide`; each posts a `result` message into the customer's chat
   ([ADR 0026](docs/adr/0026-the-staff-decision-endpoints-and-the-result-message.md)).
+- The Ready step: `POST /staff/orders/{id}/ready` (no body, needs `orders.decide`) moves an accepted order to `ready` and posts a
+  `result` message with `status: ready` in the customer's chat ([ADR 0027](docs/adr/0027-the-ready-step.md)).
 
 On local and staging, staff signed in through the admin can open Swagger UI at `/api/docs/`;
 production serves nothing there. The two Flutter repositories pin the contract by commit until

@@ -19,4 +19,9 @@ urlpatterns = [
         staff_views.StaffOrderRejectView.as_view(),
         name="staff-orders-reject",
     ),
+    path(
+        "staff/orders/<uuid:id>/ready",
+        staff_views.StaffOrderReadyView.as_view(),
+        name="staff-orders-ready",
+    ),
 ]

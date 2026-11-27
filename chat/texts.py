@@ -185,6 +185,10 @@ _TEXTS: dict[str, dict[str, str]] = {
         "en": "Sorry, the restaurant could not accept your order #{number}. {reason}",
         "ar": "عذراً، لم يتمكن المطعم من قبول طلبك رقم {number}. {reason}",
     },
+    "result_ready": {
+        "en": "Your order #{number} is ready. We are bringing it to your car.",
+        "ar": "طلبك رقم {number} جاهز. نحن في طريقنا إليك بالطلب.",
+    },
     "reject_item_unavailable": {
         "en": "Part of the order is finished or unavailable.",
         "ar": "جزء من الطلب انتهى أو غير متوفر.",

@@ -201,8 +201,8 @@ own pull request, and after each one the frontend is told the commit to pin:
 
 ## 13. D4: polish
 
-- [ ] Second, fake restaurant (`is_demo` set) at another location, entered in the admin on staging only, to prove many restaurants work
-- [ ] Optional `ready` step and its chat message
+- [ ] Second, fake restaurant (`is_demo` set) at another location, entered in the admin on staging only, to prove many restaurants work (deferred by the owner on 2026-11-27: only Gulf Food for now)
+- [x] Optional `ready` step and its chat message: `POST /staff/orders/{id}/ready` moves an accepted order to ready, sets `ready_at` and posts a `result` message with `status: ready` ([ADR 0027](adr/0027-the-ready-step.md))
 - [x] Logs: one line per request with timing (the access-log line with the time and the request id exists since the API hardening step), one line per assistant call with purpose, latency and outcome (`assistant.calls`, `assistant/services.py`), never customer text, audio or position
 - [x] README: run locally, run the tests, deploy, environment variables, logs, entering a restaurant and its menu in the admin (the last one is [`docs/data-entry.md`](data-entry.md))
 - [ ] Publish release `v1.0.0`
