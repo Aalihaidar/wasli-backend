@@ -8,6 +8,7 @@ A failed call raises an ``AssistantError``; the conversation then uses its no-as
 (the item picker, one car question at a time). Nothing is retried inside a customer's request.
 """
 
+import logging
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -34,6 +35,8 @@ from .types import (
 )
 
 _R = TypeVar("_R", bound=BaseModel)
+
+logger = logging.getLogger("assistant.calls")
 
 
 def get_adapter(provider: str | None = None) -> AssistantAdapter:
@@ -176,16 +179,29 @@ class Assistant:
             outcome, error_code = Outcome.ERROR, "unexpected"
             raise AssistantError("unexpected") from None
         finally:
+            latency_ms = int((time.monotonic() - started) * 1000)
+            input_kind = (
+                InputKind.AUDIO if isinstance(message, AudioInput) else InputKind.TEXT
+            )
+            # One line per call for the platform's log: the facts only, never the content, the
+            # model code, a position or a phone number.
+            logger.info(
+                "assistant call provider=%s purpose=%s input=%s outcome=%s latency_ms=%d error=%s",
+                self.adapter.name,
+                purpose,
+                input_kind,
+                outcome,
+                latency_ms,
+                error_code or "-",
+            )
             AICallLog.objects.create(
                 restaurant=restaurant,
                 conversation=conversation,
                 provider=self.adapter.name,
                 model=completion.model if completion else _model_name(self.adapter),
                 purpose=purpose,
-                input_kind=InputKind.AUDIO
-                if isinstance(message, AudioInput)
-                else InputKind.TEXT,
-                latency_ms=int((time.monotonic() - started) * 1000),
+                input_kind=input_kind,
+                latency_ms=latency_ms,
                 input_tokens=completion.usage.input_tokens if completion else None,
                 output_tokens=completion.usage.output_tokens if completion else None,
                 outcome=outcome,

@@ -203,8 +203,8 @@ own pull request, and after each one the frontend is told the commit to pin:
 
 - [ ] Second, fake restaurant (`is_demo` set) at another location, entered in the admin on staging only, to prove many restaurants work
 - [ ] Optional `ready` step and its chat message
-- [ ] Logs: one line per request with timing (the access-log line with the time and the request id exists since the API hardening step), one line per assistant call with purpose, latency and outcome, never customer text, audio or position
-- [ ] README: run locally, run the tests, deploy, environment variables, entering a restaurant and its menu in the admin
+- [x] Logs: one line per request with timing (the access-log line with the time and the request id exists since the API hardening step), one line per assistant call with purpose, latency and outcome (`assistant.calls`, `assistant/services.py`), never customer text, audio or position
+- [x] README: run locally, run the tests, deploy, environment variables, logs, entering a restaurant and its menu in the admin (the last one is [`docs/data-entry.md`](data-entry.md))
 - [ ] Publish release `v1.0.0`
 - [ ] **D4 done:** staging is complete and safe to show
 
