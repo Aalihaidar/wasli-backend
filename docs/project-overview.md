@@ -2,7 +2,7 @@
 
 A high-level picture of what Wasli is, who uses it, how an order travels through it and how this repository is organised. Read it first; the detailed rules are in [`api-conventions.md`](api-conventions.md) and in the generated `openapi/schema.yaml` (the final truth for endpoints). The checklist of work is [`steps.md`](steps.md).
 
-> **Status (2026-11-18):** the repository holds the Django scaffold, the `users` app (sign-in with username, email or phone), the Wasli settings, the DRF defaults (token authentication, closed by default, shared pagination, throttling, the error body), the models, admin and tests of `core`, `restaurants`, `menu`, `customers`, `chat`, `orders` and `assistant`, and the `messaging` outbox. Built on top: the public endpoints `config`, `restaurants/nearby` (with an optional `nearest`) and `restaurants/{slug}`, the ten customer-account endpoints (sign-up with a verification code, sign-in, password reset, the added contact), the API hardening baseline (request id, no-store, body size cap), R2 media storage, the assistant layer (adapters, call log, developer spike), the staff-only Swagger page on staging, the Ink & Mustard Django admin, and `openapi/schema.yaml`, which the two Flutter repositories pin by commit. Staging is live on Render and needs a manual redeploy to pick up what was merged since. Not built yet: the order service and the conversation engine (D2), the staff endpoints (D3) and the real run of the assistant spike. Everything else below is the agreed design, built milestone by milestone (D0 to D4 for the first version on staging, then the pilot). D0 still needs the production CORS origins and the production Render service (the staging site origins are decided). Agreed on 2026-11-07 and built in D1: no demo mode (staging is shown to restaurant managers, production is the final product), data entered in the Django admin, images on Cloudflare R2, customer sign-up with verification codes and the `messaging` outbox.
+> **Status (2026-11-20):** the repository holds the Django scaffold, the `users` app (sign-in with username, email or phone), the Wasli settings, the DRF defaults (token authentication, closed by default, shared pagination, throttling, the error body), the models, admin and tests of `core`, `restaurants`, `menu`, `customers`, `chat`, `orders` and `assistant`, and the `messaging` outbox. Built on top: the public endpoints `config`, `restaurants/nearby` (with an optional `nearest`) and `restaurants/{slug}`, the ten customer-account endpoints (sign-up with a verification code, sign-in, password reset, the added contact), the API hardening baseline (request id, no-store, body size cap), R2 media storage, the assistant layer (adapters, call log, developer spike), the staff-only Swagger page on staging, the Ink & Mustard Django admin, and `openapi/schema.yaml`, which the two Flutter repositories pin by commit. Staging is live on Render (redeployed by hand on 2026-11-18). Arabic names are optional with an English fallback, a restaurant has an optional service distance instead of a parking lot (ADR 0015), and `docs/data-entry.md` is the guide for entering a restaurant in the admin. Since then (D2, 2026-11-22): the order service (pricing and placing, no endpoint) and the text chat (open a conversation, send a message or a button, read messages, the order summary, ADR 0019). Voice (ADR 0021) and the rest of the chat are built too: the car question, the note, the review, the position and the placed order (ADR 0022). Not built yet: the fallbacks without the assistant for the car question (D2), the staff endpoints (D3) and the real run of the assistant spike. Everything else below is the agreed design, built milestone by milestone (D0 to D4 for the first version on staging, then the pilot). D0 still needs the production CORS origins and the production Render service (the staging site origins are decided). Agreed on 2026-11-07 and built in D1: no demo mode (staging is shown to restaurant managers, production is the final product), data entered in the Django admin, images on Cloudflare R2, customer sign-up with verification codes and the `messaging` outbox.
 
 ## 1. What Wasli is
 
@@ -18,7 +18,7 @@ flowchart TB
         OWN["Owner"]
         BRO["Brother"]
     end
-    ADM["Django admin<br/>full access to everything:<br/>restaurants, parking lots, menus,<br/>subscriptions, customers and bans"]
+    ADM["Django admin<br/>full access to everything:<br/>restaurants, menus,<br/>subscriptions, customers and bans"]
     OWN & BRO -->|"email + password"| ADM
 
     subgraph RA["Restaurant A (isolated tenant)"]
@@ -137,7 +137,7 @@ sequenceDiagram
     B-->>C: Order sent
 ```
 
-The backend decides every next step, **writes every message** in the customer's language, checks items against the menu, calculates every price and creates the order. Gemini is called only to **understand** (the order, a yes or an edit, the car details inside one answer, voice) and never writes text, prices or orders. If it is unavailable the chat still works: the car questions are asked one at a time and an item picker builds the order.
+The backend decides every next step, **writes every message** in the customer's language, checks items against the menu, calculates every price and creates the order. The assistant provider (Groq, with Gemini kept to compare) is called only to **understand** (the order, a yes or an edit, the car details inside one answer, voice) and never writes text, prices or orders. If it is unavailable the chat still works: the car questions are asked one at a time and an item picker builds the order.
 
 ### Conversation states
 
@@ -189,9 +189,9 @@ erDiagram
     USER ||--o{ VERIFICATION_CODE : "proves a contact with"
     CUSTOMER ||--o{ CUSTOMER_SESSION : "signs in with"
     CUSTOMER ||--o{ VEHICLE : owns
-    PARKING_LOT ||--o{ RESTAURANT : hosts
     RESTAURANT ||--o{ MENU_IMAGE : shows
     RESTAURANT ||--o{ MENU_CATEGORY : has
+    MENU_CATEGORY ||--o{ MENU_CATEGORY : "has subcategories (up to 3 levels)"
     MENU_CATEGORY ||--o{ MENU_ITEM : contains
     MENU_ITEM ||--o{ OPTION_GROUP : has
     OPTION_GROUP ||--o{ OPTION : has
@@ -265,13 +265,13 @@ Rules that apply to every table:
 | --- | --- |
 | `users` | The one account table (`User`): username, email, phone, password |
 | `core` | Base model, restaurant scoping, permission codes and checks, money and distance helpers |
-| `restaurants` | Parking lots, restaurants, menu images, staff memberships |
+| `restaurants` | Restaurants (with an optional service distance), menu images, staff memberships, the staff sign-in |
 | `menu` | Categories, items, option groups, options |
 | `customers` | Customer profiles, sessions and their authentication, vehicles, blocks, sign-up, sign-in, password reset and the verification codes |
 | `messaging` | The outbox (emails and SMS shown in the admin on staging), the delivery interface and its backends |
 | `chat` | Conversations, messages, the conversation engine and every bot text in Arabic and English |
-| `orders` | Orders, order items, order events, pricing, order creation and status changes |
-| `assistant` | The adapter to the understanding provider (Gemini first, a fake one in tests), prompts, call log |
+| `orders` | Orders, order items, order events, pricing, order creation, the restaurant's answer and the staff orders list |
+| `assistant` | The adapters to the understanding provider (Groq as the main one, Gemini as the second, a fake one in tests), prompts, key and quota counters, call log |
 
 Working rules:
 

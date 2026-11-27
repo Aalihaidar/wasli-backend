@@ -2,36 +2,15 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from core.permissions import Role
-from restaurants.models import ParkingLot, Restaurant, StaffMembership
-from restaurants.tests.factories import make_lot, make_member, make_restaurant
+from core.permissions import Permission, Role, role_has_permission
+from restaurants.models import (
+    RestaurantMenuImage,
+    StaffMembership,
+)
+from restaurants.tests.factories import make_member, make_restaurant
 from users.models import User
 
 pytestmark = pytest.mark.django_db
-
-
-class TestParkingLot:
-    def test_defaults(self) -> None:
-        lot = make_lot()
-
-        assert lot.radius_m == 300
-        assert lot.pk.version == 4
-        assert str(lot) == "Marina Lot"
-
-    @pytest.mark.parametrize(("lat", "lng"), [(91, 0), (-91, 0), (0, 181), (0, -181)])
-    def test_a_position_outside_the_globe_is_rejected(
-        self, lat: float, lng: float
-    ) -> None:
-        lot = ParkingLot(name="Bad", latitude=lat, longitude=lng)
-
-        with pytest.raises(ValidationError):
-            lot.full_clean()
-
-    def test_the_radius_must_be_positive(self) -> None:
-        lot = ParkingLot(name="Bad", latitude=0, longitude=0, radius_m=0)
-
-        with pytest.raises(ValidationError):
-            lot.full_clean()
 
 
 class TestRestaurant:
@@ -80,12 +59,29 @@ class TestRestaurant:
             restaurant.full_clean()
         assert "brand_colour" in error.value.message_dict
 
-    def test_a_restaurant_keeps_its_parking_lot(self) -> None:
+    def test_the_service_distance_is_optional(self) -> None:
         restaurant = make_restaurant()
 
-        with pytest.raises(Exception, match="protected"):
-            restaurant.parking_lot.delete()
-        assert Restaurant.objects.filter(pk=restaurant.pk).exists()
+        restaurant.full_clean()
+
+        assert restaurant.service_radius_m is None
+
+    def test_a_service_distance_can_be_set(self) -> None:
+        restaurant = make_restaurant("gulf-food", service_radius_m=300)
+
+        restaurant.full_clean()
+        restaurant.refresh_from_db()
+
+        assert restaurant.service_radius_m == 300
+
+    @pytest.mark.parametrize("value", [0, -5])
+    def test_the_service_distance_must_be_positive_when_given(self, value: int) -> None:
+        restaurant = make_restaurant()
+        restaurant.service_radius_m = value
+
+        with pytest.raises(ValidationError) as error:
+            restaurant.full_clean()
+        assert "service_radius_m" in error.value.message_dict
 
 
 class TestStaffMembership:
@@ -226,3 +222,73 @@ class TestLastAdmin:
         member = make_member(make_restaurant(), "boss", Role.ADMIN)
 
         assert member.role == "admin"
+
+
+class TestEnglishOnlyRestaurant:
+    def test_the_arabic_name_and_caption_can_be_left_empty(self) -> None:
+        restaurant = make_restaurant("gulf-food", name_ar="")
+
+        restaurant.full_clean()
+
+        assert restaurant.name_ar == ""
+        assert restaurant.name_ar_display == "Gulf Food"
+
+    def test_a_menu_image_caption_falls_back_to_english(self) -> None:
+        restaurant = make_restaurant("gulf-food", name_ar="")
+        image = RestaurantMenuImage(
+            restaurant=restaurant, image="x.jpg", caption_en="Main menu"
+        )
+
+        image.full_clean(exclude=["image"])
+
+        assert image.caption_ar_display == "Main menu"
+        image.caption_ar = "القائمة"
+        assert image.caption_ar_display == "القائمة"
+
+
+class TestStaffAccountsOfARestaurant:
+    """One restaurant can have the accounts it needs: one admin that does everything, or an
+    admin and cashiers, or several of each."""
+
+    @pytest.mark.parametrize(
+        ("username", "role"),
+        [
+            ("gulf-food-admin", Role.ADMIN),
+            ("gulf-food-admin2", Role.ADMIN),
+            ("gulf-food-cashier", Role.CASHIER),
+            ("gulf-food-cashier2", Role.CASHIER),
+            ("gulf-food-cashier3", Role.CASHIER),
+        ],
+    )
+    def test_the_naming_convention_is_a_valid_username(
+        self, username: str, role: Role
+    ) -> None:
+        member = make_member(make_restaurant("gulf-food"), username, role)
+
+        member.full_clean()
+
+        assert len(username) <= 30
+
+    def test_a_restaurant_can_have_several_admins_and_several_cashiers(self) -> None:
+        restaurant = make_restaurant("gulf-food")
+        make_member(restaurant, "gulf-food-admin", Role.ADMIN)
+        make_member(restaurant, "gulf-food-admin2", Role.ADMIN)
+        make_member(restaurant, "gulf-food-cashier", Role.CASHIER)
+        make_member(restaurant, "gulf-food-cashier2", Role.CASHIER)
+
+        roles = list(
+            StaffMembership.objects.filter(restaurant=restaurant)
+            .order_by("user__username")
+            .values_list("role", flat=True)
+        )
+
+        assert roles == ["admin", "admin", "cashier", "cashier"]
+
+    def test_a_small_restaurant_can_work_with_one_admin_account_only(self) -> None:
+        restaurant = make_restaurant("gulf-food")
+        admin = make_member(restaurant, "gulf-food-admin", Role.ADMIN)
+
+        # The one admin sees and decides orders (what a cashier does) and manages the rest.
+        assert role_has_permission(admin.role, Permission.ORDERS_VIEW)
+        assert role_has_permission(admin.role, Permission.ORDERS_DECIDE)
+        assert role_has_permission(admin.role, Permission.MENU_EDIT)

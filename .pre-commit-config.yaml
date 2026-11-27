@@ -59,8 +59,9 @@ repos:
         args: [--branch, main, --branch, develop]
 
   # Secret scanner: blocks a commit whose staged changes contain an API key, token or password (Gemini, Neon, Render,
-  # cloud providers, ...). It replaces GitHub secret scanning and push protection, which a private repository does not
-  # get. Real keys live only in `.env` (git-ignored) and in the hosting platform's environment variables.
+  # cloud providers, ...). It is the guard that works in every repository state: GitHub secret scanning and push
+  # protection exist only while the repository is public. Real keys live only in `.env` (git-ignored) and in the hosting
+  # platform's environment variables.
   # Allow a false positive in `.gitleaks.toml`, never with a blanket ignore.
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
@@ -68,7 +69,7 @@ repos:
       - id: gitleaks
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.4
+    rev: v0.17.5
     hooks:
       - id: ruff-check
         args: [--fix, --output-format=full]
@@ -84,7 +85,7 @@ repos:
 
   # Keeps uv.lock in sync whenever pyproject.toml changes.
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.13.7
+    rev: 0.13.8
     hooks:
       - id: uv-lock
 
@@ -102,12 +103,12 @@ repos:
   # actionlint and zizmor run at these revs in the Lint workflow too (check-tool-pins.sh compares them); hadolint,
   # cspell and markdownlint are bundled with their pinned actions there, so those versions can differ slightly.
   - repo: https://github.com/streetsidesoftware/cspell-cli
-    rev: v10.4.0
+    rev: v10.4.1
     hooks:
       - id: cspell
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.24.0
+    rev: v0.24.1
     hooks:
       - id: markdownlint-cli2
 

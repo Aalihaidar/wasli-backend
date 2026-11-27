@@ -18,7 +18,7 @@ from orders.models import (
     RejectionReason,
 )
 from orders.tests.factories import make_event, make_order, make_order_item
-from restaurants.tests.factories import make_lot, make_restaurant
+from restaurants.tests.factories import make_restaurant
 
 pytestmark = pytest.mark.django_db
 
@@ -30,7 +30,7 @@ class TestOrder:
 
         assert order.pk.version == 4
         assert order.status == OrderStatus.PLACED
-        assert order.fulfilment_type == "car"
+        assert order.order_type == "car"
         assert order.currency == "AED"
         assert order.customer_lat is None
         assert order.location_source == "none"
@@ -191,12 +191,11 @@ class TestOrder:
             location_source="gps",
             location_captured_at=now,
             distance_m=85,
-            lot_distance_m=60,
         )
         order.refresh_from_db()
 
         assert (order.customer_lat, order.customer_lng) == (25.2001, 55.2701)
-        assert (order.distance_m, order.lot_distance_m) == (85, 60)
+        assert order.distance_m == 85
 
     def test_a_position_stays_on_earth(self) -> None:
         for field, value in (
@@ -261,7 +260,7 @@ class TestOrder:
         }
 
     @pytest.mark.parametrize(
-        ("lot_distance_m", "band"),
+        ("distance_m", "band"),
         [
             (None, DistanceBand.UNKNOWN),
             (0, DistanceBand.IN_LOT),
@@ -271,13 +270,22 @@ class TestOrder:
             (901, DistanceBand.FAR),
         ],
     )
-    def test_the_distance_band_comes_from_the_lot_radius(
-        self, lot_distance_m: int | None, band: DistanceBand
+    def test_the_distance_band_comes_from_the_restaurants_service_distance(
+        self, distance_m: int | None, band: DistanceBand
     ) -> None:
-        restaurant = make_restaurant("cafe-a", lot=make_lot(radius_m=300))
-        order = make_order(restaurant, lot_distance_m=lot_distance_m)
+        restaurant = make_restaurant("cafe-a", service_radius_m=300)
+        order = make_order(restaurant, distance_m=distance_m)
 
         assert order.distance_band == band
+
+    def test_a_restaurant_with_no_service_distance_uses_the_default_for_the_label(
+        self,
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        near = make_order(restaurant, distance_m=500)
+
+        assert restaurant.service_radius_m is None
+        assert near.distance_band == DistanceBand.NEAR
 
     def test_a_restaurant_with_orders_cannot_be_deleted(self) -> None:
         order = make_order()

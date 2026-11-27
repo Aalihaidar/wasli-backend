@@ -1,7 +1,7 @@
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from config.env import env_bool, env_choice, env_int
+from config.env import env_bool, env_choice, env_int, env_numbered
 
 
 class TestEnvBool:
@@ -87,3 +87,30 @@ class TestEnvInt:
         monkeypatch.setenv("LIMIT", "0")
 
         assert env_int("LIMIT", 15) == 0
+
+
+class TestEnvNumbered:
+    def test_values_come_in_number_order_with_their_numbers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("KEY_3", "third")
+        monkeypatch.setenv("KEY_1", " first ")
+
+        assert env_numbered("KEY_", 5) == ((1, "first"), (3, "third"))
+
+    def test_empty_and_missing_slots_are_skipped(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("KEY_1", "")
+        monkeypatch.setenv("KEY_2", "   ")
+        monkeypatch.delenv("KEY_3", raising=False)
+        monkeypatch.setenv("KEY_4", "fourth")
+
+        assert env_numbered("KEY_", 5) == ((4, "fourth"),)
+
+    def test_a_slot_above_the_count_is_ignored(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("KEY_6", "too many")
+
+        assert env_numbered("KEY_", 5) == ()

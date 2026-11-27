@@ -8,6 +8,7 @@ A failed call raises an ``AssistantError``; the conversation then uses its no-as
 (the item picker, one car question at a time). Nothing is retried inside a customer's request.
 """
 
+import logging
 import time
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -15,10 +16,10 @@ from typing import Any, TypeVar
 from django.conf import settings
 from pydantic import BaseModel
 
-from . import limits
+from . import limits, quota
 from .adapters.base import AssistantAdapter
 from .adapters.fake import FakeAdapter
-from .errors import AssistantError, AssistantInputError
+from .errors import AssistantBudgetExceeded, AssistantError, AssistantInputError
 from .models import AICallLog, InputKind, Outcome, Purpose
 from .types import (
     AudioInput,
@@ -35,14 +36,29 @@ from .types import (
 
 _R = TypeVar("_R", bound=BaseModel)
 
+logger = logging.getLogger("assistant.calls")
 
-def get_adapter() -> AssistantAdapter:
-    """The adapter named by ``AI_PROVIDER`` (``fake`` or ``gemini``)."""
-    if settings.AI_PROVIDER == "gemini":
+
+def get_adapter(provider: str | None = None) -> AssistantAdapter:
+    """The adapter named by ``AI_PROVIDER`` (``groq``, ``gemini`` or ``fake``), or by
+    ``provider`` when the developer spike compares another one."""
+    chosen = provider or settings.AI_PROVIDER
+    if chosen == "groq":
+        from .adapters.groq import GroqAdapter
+
+        return GroqAdapter.from_settings()
+    if chosen == "gemini":
         from .adapters.gemini import GeminiAdapter
 
         return GeminiAdapter.from_settings()
     return FakeAdapter.recorded()
+
+
+def check_budget(provider: str) -> None:
+    """Refuse a call when the provider's day is used up. Only Gemini has a daily budget counted
+    here; Groq keys count their own minute and day while they are chosen (``assistant.keys``)."""
+    if provider == "gemini" and not quota.gemini_budget_left():
+        raise AssistantBudgetExceeded
 
 
 def check_message(message: MessageInput) -> None:
@@ -153,6 +169,7 @@ class Assistant:
         error_code = ""
         completion: Completion[_R] | None = None
         try:
+            check_budget(self.adapter.name)
             completion = run()
         except AssistantError as error:
             outcome, error_code = error.outcome, error.code
@@ -162,16 +179,29 @@ class Assistant:
             outcome, error_code = Outcome.ERROR, "unexpected"
             raise AssistantError("unexpected") from None
         finally:
+            latency_ms = int((time.monotonic() - started) * 1000)
+            input_kind = (
+                InputKind.AUDIO if isinstance(message, AudioInput) else InputKind.TEXT
+            )
+            # One line per call for the platform's log: the facts only, never the content, the
+            # model code, a position or a phone number.
+            logger.info(
+                "assistant call provider=%s purpose=%s input=%s outcome=%s latency_ms=%d error=%s",
+                self.adapter.name,
+                purpose,
+                input_kind,
+                outcome,
+                latency_ms,
+                error_code or "-",
+            )
             AICallLog.objects.create(
                 restaurant=restaurant,
                 conversation=conversation,
                 provider=self.adapter.name,
                 model=completion.model if completion else _model_name(self.adapter),
                 purpose=purpose,
-                input_kind=InputKind.AUDIO
-                if isinstance(message, AudioInput)
-                else InputKind.TEXT,
-                latency_ms=int((time.monotonic() - started) * 1000),
+                input_kind=input_kind,
+                latency_ms=latency_ms,
                 input_tokens=completion.usage.input_tokens if completion else None,
                 output_tokens=completion.usage.output_tokens if completion else None,
                 outcome=outcome,

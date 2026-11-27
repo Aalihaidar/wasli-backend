@@ -1,11 +1,12 @@
 from menu.models import MenuItem
+from menu.services import visible_categories
 from restaurants.models import Restaurant
 
 from .types import PromptGroup, PromptItem, PromptMenu, PromptOption
 
 
 def build_prompt_menu(restaurant: Restaurant) -> PromptMenu:
-    """This restaurant's menu as the assistant sees it: every item of an active category, with
+    """This restaurant's menu as the assistant sees it: every item of a visible category (active, and so are its parents), with
     its aliases, option groups and options, and no price.
 
     Only this restaurant's rows are read (``for_restaurant``), so another restaurant's items can
@@ -14,7 +15,7 @@ def build_prompt_menu(restaurant: Restaurant) -> PromptMenu:
     """
     items = (
         MenuItem.objects.for_restaurant(restaurant)
-        .filter(category__is_active=True)
+        .filter(category__in=visible_categories(restaurant))
         .prefetch_related("option_groups__options")
     )
     return PromptMenu(

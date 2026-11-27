@@ -283,3 +283,165 @@ class TestOption:
         make_option(make_group(make_item(make_category(b))))
 
         assert list(Option.objects.for_restaurant(a)) == [option_a]
+
+
+class TestEnglishOnlyMenu:
+    """A restaurant whose menu is in English only leaves every Arabic text empty."""
+
+    def test_every_arabic_name_can_be_left_empty(self) -> None:
+        restaurant = make_restaurant("cafe-en", name_ar="")
+        category = MenuCategory.objects.create(restaurant=restaurant, name_en="Drinks")
+        item = MenuItem.objects.create(
+            category=category, name_en="Karak tea", price_minor=500
+        )
+        group = OptionGroup.objects.create(item=item, name_en="Size")
+        option = Option.objects.create(group=group, name_en="Large")
+
+        for row in (restaurant, category, item, group, option):
+            row.full_clean()
+            assert row.name_ar == ""
+
+    def test_the_english_name_stands_in_for_the_missing_arabic_one(self) -> None:
+        restaurant = make_restaurant("cafe-en", name_ar="")
+        category = MenuCategory.objects.create(restaurant=restaurant, name_en="Drinks")
+        item = MenuItem.objects.create(
+            category=category,
+            name_en="Karak tea",
+            description_en="Strong and sweet",
+            price_minor=500,
+        )
+        group = OptionGroup.objects.create(item=item, name_en="Size")
+        option = Option.objects.create(group=group, name_en="Large")
+
+        assert restaurant.name_ar_display == "Cafe En"
+        assert category.name_ar_display == "Drinks"
+        assert item.name_ar_display == "Karak tea"
+        assert item.description_ar_display == "Strong and sweet"
+        assert group.name_ar_display == "Size"
+        assert option.name_ar_display == "Large"
+
+    def test_an_arabic_name_is_kept_when_there_is_one(self) -> None:
+        item = make_item(make_category(make_restaurant("cafe-ar")), "Karak tea")
+
+        assert item.name_ar == "شاي"
+        assert item.name_ar_display == "شاي"
+
+    def test_the_fallback_does_not_write_a_copy_into_the_database(self) -> None:
+        item = make_item(make_category(make_restaurant("cafe-en")), "Karak tea")
+        item.name_ar = ""
+        item.save()
+
+        item.name_en = "Chai karak"
+        item.save()
+        item.refresh_from_db()
+
+        # Renaming the English name changes what the Arabic side shows: no stale copy.
+        assert item.name_ar == ""
+        assert item.name_ar_display == "Chai karak"
+
+
+class TestCategoryNesting:
+    """A menu has up to three levels: category, subcategory and sub-subcategory."""
+
+    def test_a_top_level_category_has_depth_one_and_no_parent(self) -> None:
+        category = make_category(make_restaurant("cafe-a"), "Burgers")
+
+        assert category.parent is None
+        assert category.depth == 1
+        assert category.path == "Burgers"
+
+    def test_subcategories_and_sub_subcategories_know_their_depth_and_path(
+        self,
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        burgers = make_category(restaurant, "Burgers")
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        chicken = make_category(restaurant, "Chicken", parent=grilled)
+
+        assert (grilled.depth, chicken.depth) == (2, 3)
+        assert chicken.path == "Burgers > Grilled > Chicken"
+        assert str(chicken) == "Cafe A: Burgers > Grilled > Chicken"
+        assert list(burgers.children.all()) == [grilled]
+
+    def test_a_fourth_level_is_refused(self) -> None:
+        restaurant = make_restaurant("cafe-a")
+        one = make_category(restaurant, "One")
+        two = make_category(restaurant, "Two", parent=one)
+        three = make_category(restaurant, "Three", parent=two)
+
+        with pytest.raises(ValidationError) as error:
+            make_category(restaurant, "Four", parent=three)
+        assert "parent" in error.value.message_dict
+        assert not MenuCategory.objects.filter(name_en="Four").exists()
+
+    def test_the_parent_must_belong_to_the_same_restaurant(self) -> None:
+        a, b = make_restaurant("cafe-a"), make_restaurant("cafe-b")
+        top = make_category(a, "Burgers")
+
+        with pytest.raises(ValidationError) as error:
+            make_category(b, "Grilled", parent=top)
+        assert "parent" in error.value.message_dict
+
+    def test_a_category_cannot_be_its_own_parent(self) -> None:
+        category = make_category(make_restaurant("cafe-a"), "Burgers")
+        category.parent = category
+
+        with pytest.raises(ValidationError) as error:
+            category.full_clean()
+        assert "parent" in error.value.message_dict
+
+    def test_a_category_cannot_move_inside_its_own_subcategory(self) -> None:
+        restaurant = make_restaurant("cafe-a")
+        burgers = make_category(restaurant, "Burgers")
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        burgers.parent = grilled
+
+        with pytest.raises(ValidationError) as error:
+            burgers.full_clean()
+        assert "parent" in error.value.message_dict
+
+    def test_a_branch_cannot_be_moved_where_it_would_make_four_levels(self) -> None:
+        restaurant = make_restaurant("cafe-a")
+        food = make_category(restaurant, "Food")
+        mains = make_category(restaurant, "Mains", parent=food)
+        burgers = make_category(restaurant, "Burgers")
+        make_category(restaurant, "Grilled", parent=burgers)
+        # Food > Mains > Burgers > Grilled would be four levels.
+        burgers.parent = mains
+
+        with pytest.raises(ValidationError) as error:
+            burgers.full_clean()
+        assert "parent" in error.value.message_dict
+
+    def test_a_branch_can_be_moved_when_the_levels_still_fit(self) -> None:
+        restaurant = make_restaurant("cafe-a")
+        food = make_category(restaurant, "Food")
+        burgers = make_category(restaurant, "Burgers")
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        burgers.parent = food
+
+        burgers.full_clean()
+        burgers.save()
+
+        assert grilled.depth == 3
+
+    def test_a_category_with_subcategories_cannot_be_deleted(self) -> None:
+        restaurant = make_restaurant("cafe-a")
+        burgers = make_category(restaurant, "Burgers")
+        make_category(restaurant, "Grilled", parent=burgers)
+
+        with pytest.raises(ProtectedError):
+            burgers.delete()
+
+    def test_items_can_sit_at_any_level(self) -> None:
+        restaurant = make_restaurant("cafe-a")
+        burgers = make_category(restaurant, "Burgers")
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        chicken = make_category(restaurant, "Chicken", parent=grilled)
+
+        for category in (burgers, grilled, chicken):
+            item = make_item(category, f"Item in {category.name_en}")
+            item.full_clean()
+
+        assert burgers.items.count() == 1
+        assert chicken.items.count() == 1

@@ -9,6 +9,7 @@ from django.forms.models import model_to_dict
 from assistant import limits
 from assistant.adapters.fake import FakeAdapter
 from assistant.errors import (
+    AssistantBudgetExceeded,
     AssistantError,
     AssistantInputError,
     AssistantInvalidOutput,
@@ -93,6 +94,26 @@ class TestCallLog:
                     SECRET, "en"
                 )
 
+        assert SECRET not in caplog.text
+
+    def test_each_call_writes_one_line_with_the_facts_only(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.INFO, logger="assistant.calls"):
+            Assistant(FakeAdapter.recorded()).classify_reply(SECRET, "en")
+            with pytest.raises(AssistantError):
+                Assistant(FakeAdapter(fail_with=AssistantTimeout())).classify_reply(
+                    SECRET, "en"
+                )
+
+        lines = [record.getMessage() for record in caplog.records]
+        assert len(lines) == 2
+        assert lines[0].startswith(
+            "assistant call provider=fake purpose=classify_reply input=text outcome=ok latency_ms="
+        )
+        assert lines[0].endswith("error=-")
+        assert "outcome=timeout" in lines[1]
+        assert "error=" in lines[1] and not lines[1].endswith("error=-")
         assert SECRET not in caplog.text
 
     def test_a_voice_call_is_logged_as_audio(self) -> None:
@@ -215,3 +236,73 @@ class TestProviderChoice:
 
         with pytest.raises(AssistantNotConfigured):
             assistant.classify_reply("yes", "en")
+
+
+class TestGeminiBudget:
+    def _gemini_fake(self) -> FakeAdapter:
+        fake = FakeAdapter()
+        fake.name = "gemini"
+        return fake
+
+    def test_a_call_over_the_daily_budget_is_refused_logged_and_never_sent(
+        self, settings: Any
+    ) -> None:
+        settings.GEMINI_DAILY_REQUEST_LIMIT = 2
+        fake = self._gemini_fake()
+        assistant = Assistant(fake)
+        assistant.classify_reply("yes", "en")
+        assistant.classify_reply("yes", "en")
+
+        with pytest.raises(AssistantBudgetExceeded) as raised:
+            assistant.classify_reply("yes", "en")
+
+        assert raised.value.code == "budget_exceeded"
+        assert len(fake.calls) == 2
+        assert AICallLog.objects.filter(outcome="budget_exceeded").count() == 1
+
+    def test_the_refused_calls_do_not_use_up_the_budget_further(
+        self, settings: Any
+    ) -> None:
+        settings.GEMINI_DAILY_REQUEST_LIMIT = 1
+        assistant = Assistant(self._gemini_fake())
+        assistant.classify_reply("yes", "en")
+
+        for _ in range(3):
+            with pytest.raises(AssistantBudgetExceeded):
+                assistant.classify_reply("yes", "en")
+
+        assert AICallLog.objects.filter(outcome="ok").count() == 1
+
+    def test_another_provider_has_no_daily_budget_here(self, settings: Any) -> None:
+        settings.GEMINI_DAILY_REQUEST_LIMIT = 0
+        fake = FakeAdapter()  # named "fake"
+
+        Assistant(fake).classify_reply("yes", "en")
+
+        assert len(fake.calls) == 1
+
+
+class TestChoosingTheProvider:
+    def test_the_setting_chooses_and_an_argument_overrides_it(
+        self, settings: Any
+    ) -> None:
+        settings.AI_PROVIDER = "fake"
+        settings.GROQ_API_KEYS = ((1, "k"),)
+        settings.GROQ_CHAT_MODEL = "c"
+        settings.GROQ_STT_MODEL = "s"
+
+        assert get_adapter().name == "fake"
+        assert get_adapter("groq").name == "groq"
+
+        settings.AI_PROVIDER = "groq"
+        assert get_adapter().name == "groq"
+        assert get_adapter("fake").name == "fake"
+
+    def test_groq_without_its_settings_names_what_is_missing(
+        self, settings: Any
+    ) -> None:
+        settings.AI_PROVIDER = "groq"
+        settings.GROQ_API_KEYS = ()
+
+        with pytest.raises(AssistantNotConfigured):
+            get_adapter()

@@ -163,7 +163,7 @@ readable by everyone who can read the repository.
 | Code scanning → CodeQL | Default setup, query suite **Default**. Languages: **Actions** from day one (analyses the workflow files). **Add Python as soon as the project has code**: Settings → Advanced Security → CodeQL analysis → ⋯ → Edit configuration → tick *Python* → Save. A Django project that scans only the workflows is not scanned at all |
 | Secret Protection → Secret scanning | On |
 | Secret Protection → Push protection | **On** |
-| Secret Protection → Validity checks | On |
+| Secret Protection → Validity checks | On, when GitHub offers it (the page can show only *Push protection*, as on 2026-11-20) |
 
 **Private repositories.** Private vulnerability reporting, CodeQL code scanning
 and Secret Protection (secret scanning, push protection, validity checks) are
@@ -180,6 +180,41 @@ them, keep secrets out of the repository by other means:
   keys). It runs on the developer's machine, so keep `pre-commit install` done.
 - If a secret is ever committed or pushed, revoke it at the provider first;
   rewriting history does not make a leaked key safe.
+
+### Changing the repository's visibility
+
+The repository can be public at one time and private at another (for example,
+public while the monthly Actions minutes of a private repository on the Free
+plan are used up). What GitHub offers follows the visibility, so check this list
+each time it changes.
+
+#### Going public
+
+1. Scan the whole history for secrets once (`gitleaks git --redact`); the
+   pre-commit hook only sees the staged changes of a commit.
+2. Settings → Advanced Security: turn on private vulnerability reporting, CodeQL
+   default setup (languages *Actions* and *Python*), secret scanning and push
+   protection (and validity checks, when the page offers them).
+3. The rulesets and automatic merge start being enforced and offered. Nothing to
+   import again: the rulesets stay in the repository settings.
+4. `.github/SECURITY.md` names both reporting routes and needs no change.
+
+#### Going private again
+
+1. Private vulnerability reporting, CodeQL, secret scanning and push protection
+   are no longer offered on the Free plan. The `gitleaks` pre-commit hook is the
+   only secret guard again, so keep `pre-commit install` done.
+2. The rulesets are not enforced on a private repository on the Free plan and
+   automatic merge is not available: the pre-push hook and the topic branch and
+   pull request habit are the guard, and **CI passed** is advisory.
+3. Two places point to the private report form, which no longer exists: the
+   *Security vulnerability* link in `.github/ISSUE_TEMPLATE/config.yml` and the
+   sentence in `.github/ISSUE_TEMPLATE/bug_report.yml`. Change them to say that
+   the report goes to the owner directly.
+4. Watch the Actions minutes (Settings → Billing and plans).
+5. Anything published while the repository was public may already be forked,
+   cached or indexed. A secret found in the history is revoked at its provider,
+   never treated as safe because the repository went private.
 
 ## 5. Rulesets
 

@@ -30,6 +30,7 @@ class TestConversation:
         assert conversation.pk.version == 4
         assert conversation.state == ConversationState.ORDERING
         assert conversation.locale == "en"
+        assert conversation.order_type == "car"
         assert conversation.lines == []
         assert conversation.pending_question is None
         assert conversation.pending_field == ""
@@ -59,6 +60,14 @@ class TestConversation:
         assert conversation.is_expired(now) is False
         assert conversation.is_expired(now + timedelta(minutes=5)) is True
         assert conversation.is_expired(now + timedelta(hours=1)) is True
+
+    def test_the_order_type_is_from_its_list(self) -> None:
+        conversation = make_conversation()
+        conversation.order_type = "drone"
+
+        with pytest.raises(ValidationError) as error:
+            conversation.full_clean()
+        assert "order_type" in error.value.message_dict
 
     def test_the_state_and_locale_are_from_their_lists(self) -> None:
         conversation = make_conversation()

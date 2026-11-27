@@ -181,9 +181,8 @@ class TestSectionOrder:
 
         apps = {a["app_label"]: a for a in admin.site.get_app_list(request)}
 
-        assert [m["object_name"] for m in apps["restaurants"]["models"]][:3] == [
+        assert [m["object_name"] for m in apps["restaurants"]["models"]][:2] == [
             "Restaurant",
-            "ParkingLot",
             "StaffMembership",
         ]
         assert [m["object_name"] for m in apps["menu"]["models"]][:3] == [

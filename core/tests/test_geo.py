@@ -2,7 +2,13 @@ import math
 
 import pytest
 
-from core.geo import DistanceBand, distance_band, haversine_m, is_valid_location
+from core.geo import (
+    DEFAULT_BAND_RADIUS_M,
+    DistanceBand,
+    distance_band,
+    haversine_m,
+    is_valid_location,
+)
 
 
 def test_the_distance_between_the_same_point_is_zero() -> None:
@@ -63,10 +69,36 @@ def test_is_valid_location(
         (50_000, DistanceBand.FAR),
     ],
 )
-def test_distance_band_with_a_300_metre_radius(
+def test_distance_band_with_a_300_metre_service_distance(
     distance: float | None, expected: DistanceBand
 ) -> None:
     assert distance_band(distance, 300) == expected
+
+
+@pytest.mark.parametrize(
+    ("distance", "expected"),
+    [
+        (None, DistanceBand.UNKNOWN),
+        (100, DistanceBand.IN_LOT),
+        (101, DistanceBand.NEAR),
+        (300, DistanceBand.NEAR),
+        (301, DistanceBand.FAR),
+    ],
+)
+def test_distance_band_follows_the_restaurants_own_service_distance(
+    distance: float | None, expected: DistanceBand
+) -> None:
+    assert distance_band(distance, 100) == expected
+
+
+def test_a_restaurant_with_no_service_distance_is_measured_against_the_default() -> (
+    None
+):
+    assert DEFAULT_BAND_RADIUS_M == 300
+    assert distance_band(300, None) == DistanceBand.IN_LOT
+    assert distance_band(900, None) == DistanceBand.NEAR
+    assert distance_band(901, None) == DistanceBand.FAR
+    assert distance_band(None, None) == DistanceBand.UNKNOWN
 
 
 def test_distance_band_values_are_the_contract_strings() -> None:

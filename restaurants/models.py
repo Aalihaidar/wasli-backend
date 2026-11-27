@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
 
+from core.locales import ARABIC_OPTIONAL_HELP, ArabicFallbackMixin, arabic_or_english
+from core.media_paths import IMAGE_NAME_LENGTH, cover_path, logo_path, menu_image_path
 from core.models import BaseModel
 from core.money import CURRENCY
 from core.permissions import Role
@@ -27,26 +29,7 @@ RESERVED_SLUGS = frozenset({"nearby"})
 ROLE_CHOICES = [(role.value, role.value.title()) for role in Role]
 
 
-class ParkingLot(BaseModel):
-    """A parking area shared by one or more restaurants. A customer is "at" a restaurant when
-    they are within ``radius_m`` metres of the lot's centre."""
-
-    name = models.CharField(max_length=150)
-    address = models.CharField(max_length=255, blank=True)
-    latitude = models.FloatField(validators=_latitude_validators)
-    longitude = models.FloatField(validators=_longitude_validators)
-    radius_m = models.PositiveIntegerField(
-        default=300, validators=[MinValueValidator(1)]
-    )
-
-    class Meta:
-        ordering = ("name",)
-
-    def __str__(self) -> str:
-        return self.name
-
-
-class Restaurant(BaseModel):
+class Restaurant(ArabicFallbackMixin, BaseModel):
     class SubscriptionStatus(models.TextChoices):
         TRIAL = "trial", "Trial"
         ACTIVE = "active", "Active"
@@ -55,12 +38,18 @@ class Restaurant(BaseModel):
     # Used in URLs and QR codes (/r/<slug>).
     slug = models.SlugField(max_length=60, unique=True, validators=[_slug_validator])
     name_en = models.CharField(max_length=150)
-    name_ar = models.CharField(max_length=150)
+    name_ar = models.CharField(
+        max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
+    )
     # Empty means the default welcome text of the conversation engine.
     welcome_message_en = models.TextField(blank=True)
     welcome_message_ar = models.TextField(blank=True)
-    logo = models.ImageField(upload_to="restaurants/logos/", blank=True)
-    cover = models.ImageField(upload_to="restaurants/covers/", blank=True)
+    logo = models.ImageField(
+        upload_to=logo_path, max_length=IMAGE_NAME_LENGTH, blank=True
+    )
+    cover = models.ImageField(
+        upload_to=cover_path, max_length=IMAGE_NAME_LENGTH, blank=True
+    )
     brand_colour = models.CharField(
         max_length=7, blank=True, validators=[_colour_validator]
     )
@@ -68,8 +57,13 @@ class Restaurant(BaseModel):
     address = models.CharField(max_length=255, blank=True)
     latitude = models.FloatField(validators=_latitude_validators)
     longitude = models.FloatField(validators=_longitude_validators)
-    parking_lot = models.ForeignKey(
-        ParkingLot, on_delete=models.PROTECT, related_name="restaurants"
+    # How far from the restaurant it serves cars, in metres. Empty means no limit of its own:
+    # customers within the platform search distance (NEARBY_SEARCH_RADIUS_M) still see it.
+    service_radius_m = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        help_text="Metres from the restaurant that it serves cars. Leave empty for no limit.",
     )
     currency = models.CharField(max_length=3, default=CURRENCY, editable=False)
     timezone = models.CharField(max_length=64, default="Asia/Dubai")
@@ -121,9 +115,11 @@ class Restaurant(BaseModel):
 class RestaurantMenuImage(RestaurantOwnedModel):
     """A picture of the menu that the bot sends in the chat."""
 
-    image = models.ImageField(upload_to="restaurants/menu/")
+    image = models.ImageField(upload_to=menu_image_path, max_length=IMAGE_NAME_LENGTH)
     caption_en = models.CharField(max_length=150, blank=True)
-    caption_ar = models.CharField(max_length=150, blank=True)
+    caption_ar = models.CharField(
+        max_length=150, blank=True, help_text=ARABIC_OPTIONAL_HELP
+    )
     sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -131,6 +127,10 @@ class RestaurantMenuImage(RestaurantOwnedModel):
 
     def __str__(self) -> str:
         return f"{self.restaurant} #{self.sort_order}"
+
+    @property
+    def caption_ar_display(self) -> str:
+        return arabic_or_english(self.caption_ar, self.caption_en)
 
 
 class StaffMembership(RestaurantOwnedModel):

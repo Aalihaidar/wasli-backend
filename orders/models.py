@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, ClassVar
 
 from django.core.exceptions import ValidationError
@@ -12,6 +13,7 @@ from core.geo import (
     distance_band,
 )
 from core.money import CURRENCY
+from core.order_types import OrderType
 from core.tenancy import RestaurantOwnedModel, align_with_parent
 
 # The wait times a restaurant can promise when it accepts an order.
@@ -36,16 +38,15 @@ class OrderStatus(models.TextChoices):
 
 
 class RejectionReason(models.TextChoices):
-    ITEM_UNAVAILABLE = "item_unavailable", "Item unavailable"
+    ITEM_UNAVAILABLE = (
+        "item_unavailable",
+        "Part of the order is finished or unavailable",
+    )
     TOO_BUSY = "too_busy", "Too busy"
     CLOSING_SOON = "closing_soon", "Closing soon"
     TOO_FAR = "too_far", "Customer is too far"
     LOCATION_UNCLEAR = "location_unclear", "Location unclear"
     OTHER = "other", "Other"
-
-
-class FulfilmentType(models.TextChoices):
-    CAR = "car", "To the car"
 
 
 class PaymentMethod(models.TextChoices):
@@ -80,8 +81,9 @@ class Order(RestaurantOwnedModel):
     status = models.CharField(
         max_length=15, choices=OrderStatus, default=OrderStatus.PLACED
     )
-    fulfilment_type = models.CharField(
-        max_length=10, choices=FulfilmentType, default=FulfilmentType.CAR
+    # Copied from the conversation. Only ``car`` is accepted for now.
+    order_type = models.CharField(
+        max_length=10, choices=OrderType, default=OrderType.CAR
     )
     subtotal_minor = models.PositiveIntegerField(
         help_text="In fils: 1250 is 12.50 AED."
@@ -111,10 +113,9 @@ class Order(RestaurantOwnedModel):
         default=LocationSource.NONE.value,
     )
     location_captured_at = models.DateTimeField(null=True, blank=True)
-    # Metres from the customer to the restaurant (shown to staff) and to the parking lot's
-    # centre (used by the rules and the distance band). Empty without a position.
+    # Metres from the customer to the restaurant: shown to staff and the base of the distance
+    # band. Empty without a position.
     distance_m = models.PositiveIntegerField(null=True, blank=True)
-    lot_distance_m = models.PositiveIntegerField(null=True, blank=True)
     eta_minutes = models.PositiveSmallIntegerField(
         null=True, blank=True, choices=ETA_CHOICES
     )
@@ -174,9 +175,15 @@ class Order(RestaurantOwnedModel):
         return f"#{self.number} {self.restaurant}"
 
     @property
+    def decided_at(self) -> datetime | None:
+        """When the restaurant accepted or rejected the order; ``None`` while it is placed."""
+        return self.accepted_at or self.rejected_at
+
+    @property
     def distance_band(self) -> DistanceBand:
-        """In the lot, near it, far, or unknown; derived on read, never stored."""
-        return distance_band(self.lot_distance_m, self.restaurant.parking_lot.radius_m)
+        """Within the restaurant's service distance, near it, far, or unknown; derived on read,
+        never stored."""
+        return distance_band(self.distance_m, self.restaurant.service_radius_m)
 
     def clean(self) -> None:
         super().clean()

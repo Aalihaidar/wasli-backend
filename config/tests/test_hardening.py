@@ -172,7 +172,9 @@ def test_a_voice_upload_may_be_larger_and_has_its_own_code(api: APIClient) -> No
         VOICE, data=b"x" * (6 * 1024 * 1024 + 1), content_type="audio/wav"
     )
 
-    assert just_fine.status_code == 404  # no voice route yet, but the size was accepted
+    # The voice route needs a customer token: a 401 shows the size was accepted and the request
+    # got as far as authentication.
+    assert just_fine.status_code == 401
     assert too_big.status_code == 400
     assert too_big.json()["errors"][0]["code"] == "audio_too_large"
 

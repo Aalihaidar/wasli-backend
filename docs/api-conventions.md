@@ -70,14 +70,19 @@ with a default page size of 20 and a maximum of 100, and the envelope `count`, `
 
 **Exception: the polling lists.** Three lists are read by the sites every few seconds and keep their own
 shapes instead of the envelope: `GET /restaurants/nearby`, `GET /conversations/{id}/messages?after_seq=`
-and `GET /staff/orders?since=`. They return everything newer than the cursor the client sends. Every other
-list is paginated.
+and `GET /staff/orders?since=`. They return everything newer than the cursor the client sends. The staff list reads from a
+few seconds before `since` so a change that commits late is never missed, which means an order can arrive again unchanged: the
+app merges by `id` and keeps the latest `updated_at` ([ADR 0025](adr/0025-the-order-state-machine-and-the-staff-orders-list.md)).
+Every other list is paginated.
 
 ## Throttling
 
 Every view is throttled by default: 60 requests a minute per client address when anonymous and 240 a minute
 per account when signed in (`DEFAULT_THROTTLE_RATES`). A stricter limit for one endpoint (sending messages,
-voice) is set on its view. Counts live in each worker's memory, so the limits are approximate. A throttled
+voice, the sign-ins) is set on its view with a `throttle_scope`. A sweep over every route (`core/tests/test_endpoint_sweep.py`)
+fails when a route has no throttle, and also checks the staff routes: no token is a `401`, a customer's token is refused, and a
+member of another restaurant gets a `404` on an order that is not theirs. A new staff route that names an order must add its valid
+body to that test. Counts live in each worker's memory, so the limits are approximate. A throttled
 request gets `429` with the code `throttled`.
 
 ## Timestamps
@@ -96,9 +101,12 @@ converts to the user's time zone for display only. Dates without a time are `YYY
   `GET /api/v1/restaurants/nearby`). Nullable scalars, such as `logo_url`, are allowed. The
   generated clients read an optional reference as a nullable field, but not a nullable `allOf`
   reference. Declare such a field without `help_text`, so the schema keeps a bare `$ref`, and put
-  its explanation in the operation description.
-- A value list that grows with features (error codes, `order_type`) is a string declared with
-  `x-extensible-enum`, never a closed `enum` (ADR 0012).
+  its explanation in the operation description. `core.serializers.OmitWhenNone` leaves such a property out
+  when it has no value (a missing related object counts as none), as `Conversation.order` does before the
+  order is placed.
+- A value list that grows with features (error codes, `order_type`, the message `kind`, the conversation
+  `state`) is a string declared with `x-extensible-enum`, never a closed `enum` (ADR 0012, ADR 0019). The list
+  of those names is `EXTENSIBLE_LISTS` in `config/openapi_hooks.py`.
 
 ## Project rules
 
@@ -116,7 +124,7 @@ Decisions specific to this project, on top of the defaults above.
 
 ### Languages
 
-- Arabic (`ar`) and English (`en`) only. Text shown to customers comes as a pair of fields (`name_en`, `name_ar`, `description_en`, `description_ar`); the API returns both and the client picks one.
+- Arabic (`ar`) and English (`en`) only. Text shown to customers comes as a pair of fields (`name_en`, `name_ar`, `description_en`, `description_ar`); the API returns both and the client picks one. The Arabic side is optional in the data (an English-only restaurant leaves it empty) but never empty in the API: where there is no Arabic text, the English text is returned in the `_ar` field, so a client never receives an empty name ([ADR 0014](adr/0014-optional-arabic-names.md)).
 - Chat messages are written by the server in the conversation's `locale`. A client renders them and never builds message text.
 
 ### Roles and permissions
@@ -130,7 +138,7 @@ Decisions specific to this project, on top of the defaults above.
 ### Authentication
 
 - Everyone with an account (`users.User`) signs in with one identifier plus a password. The login field is named `username` and accepts a username, an email address or a phone number: a value with `@` is an email, a valid phone number (UAE numbers without a country code are accepted) is a phone, anything else is a username. Matching ignores case, spaces and phone formatting. A username has 3 to 30 characters (letters, digits, `.`, `_`, `-`), starts with a letter and has no `@`.
-- Restaurant staff (admin and cashier) always have a username and sign in with it (`POST /api/v1/auth/login`), then send `Authorization: Token <token>`. The platform team signs in to the Django admin with email.
+- Restaurant staff (admin and cashier) always have a username and sign in with it (`POST /api/v1/auth/login`), then send `Authorization: Token <token>`. The platform team signs in to the Django admin with email. The token is issued only to an active member of an active restaurant: a customer, a platform account without a membership and a deactivated member get the same `401 authentication_failed` as a wrong password, and no token is created. The token belongs to the account, not to the device (one sign-out ends every device until per-device tokens come before the pilot). `GET /api/v1/staff/me` returns the role, the permission codes, `must_change_password` and the restaurant; `POST /api/v1/auth/password` replaces a temporary password and keeps the token ([ADR 0024](adr/0024-the-staff-sign-in.md)).
 - Customers sign up with a full name, an email address or a phone number, and a password. A six-digit code sent to that email or phone proves it; verifying it issues the customer token, sent as `Authorization: Customer <token>`. An unverified account cannot sign in or order. A customer who signed up with an email must also verify a phone number before the first order (decided 2026-11-12; it comes with the pilot, and its error code is agreed in an API request first). Codes expire after 10 minutes, allow five attempts and have a resend limit. From the account settings a customer can add the contact they did not give at sign-up (an email or a phone number); it is confirmed with a code sent to it and saved on the account only after that. Changing a contact that is already on the account is not offered. There is no anonymous customer session. The endpoint shapes are agreed in an API request before they are built.
 - Every restaurant-owned resource is scoped to the caller's restaurant. Staff of one restaurant can never read or change another restaurant's data.
 
@@ -140,7 +148,7 @@ Decisions specific to this project, on top of the defaults above.
 
 ### Errors
 
-- The error codes a client acts on are stable: `order_invalid_transition`, `item_unavailable`, `outside_parking_lot`, `invalid_location`, `ai_unavailable`, `transcription_failed`, `conversation_expired`, `invalid_action_for_state`, `audio_too_long`, and for customer accounts `account_exists`, `code_invalid`, `code_expired`, `too_many_attempts`, `account_not_verified`.
+- The error codes a client acts on are stable: `order_invalid_transition`, `item_unavailable`, `invalid_location`, `ai_unavailable`, `transcription_failed`, `conversation_expired`, `invalid_action_for_state`, `audio_too_long`, and for customer accounts `account_exists`, `code_invalid`, `code_expired`, `too_many_attempts`, `account_not_verified`, and for the first order `phone_not_verified` (`403`, [ADR 0017](adr/0017-order-type-and-the-phone-check.md)). The restaurant's answer to an order reaches the customer as a bot message of kind `result` whose `payload` has `order_id`, `number` and `status`, plus `eta_minutes` when accepted, `rejection_reason_code` and, when the restaurant wrote one, `rejection_note` when rejected, and nothing more when the order is ready; a property that does not apply is absent, never `null` ([ADR 0026](adr/0026-the-staff-decision-endpoints-and-the-result-message.md)).
 - A missing or invalid answer inside the chat (for example a car colour) is not an HTTP error: the server asks the question again in the conversation.
 
 ### Location

@@ -8,16 +8,15 @@ and call these functions.
 from dataclasses import dataclass
 from datetime import datetime
 
-from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.fields import ErrorDetail
+from rest_framework.exceptions import PermissionDenied
 
 from messaging.models import Channel
 from users.identifiers import identify
 from users.models import User
+from users.passwords import check_password_strength
 
 from . import limits
 from .errors import (
@@ -91,25 +90,6 @@ def _mark_verified(user: User, kind: str, now: datetime) -> None:
     field = "email_verified_at" if kind == "email" else "phone_verified_at"
     setattr(user, field, now)
     user.save(update_fields=[field, "updated_at"])
-
-
-def password_error(error: DjangoValidationError, field: str) -> ValidationError:
-    """Django's password messages, with their codes (``password_too_short``...), as a 400."""
-    details = [
-        ErrorDetail(
-            item.message % item.params if item.params else item.message,
-            item.code or "invalid",
-        )
-        for item in error.error_list
-    ]
-    return ValidationError({field: details})
-
-
-def check_password_strength(password: str, user: User, field: str) -> None:
-    try:
-        validate_password(password, user=user)
-    except DjangoValidationError as error:
-        raise password_error(error, field) from None
 
 
 # --- sign up and verify ---------------------------------------------------------------------

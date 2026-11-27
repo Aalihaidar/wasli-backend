@@ -8,17 +8,17 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from menu.models import MenuCategory
+from menu.models import MenuCategory, MenuItem, Option, OptionGroup
 from menu.tests.factories import make_category, make_group, make_item, make_option
 from restaurants.models import Restaurant, RestaurantMenuImage
-from restaurants.tests.factories import make_lot, make_restaurant
+from restaurants.tests.factories import make_restaurant
 
 pytestmark = pytest.mark.django_db
 
 NEARBY = "/api/v1/restaurants/nearby"
 
-# The default test lot sits at (25.2000, 55.2700) with a 300 m radius; a point 0.001 degrees
-# north of it is about 110 m away.
+# The default test restaurant sits at (25.2001, 55.2701); this point is about 100 m from it.
+# 0.001 degrees of latitude is about 111 m.
 INSIDE = {"lat": 25.201, "lng": 55.27}
 FAR_AWAY = {"lat": 25.3, "lng": 55.4}
 
@@ -29,8 +29,7 @@ def api() -> APIClient:
 
 
 def make_at(slug: str, lat: float, lng: float, **extra: object) -> Restaurant:
-    lot = make_lot(name=f"Lot of {slug}")
-    return make_restaurant(slug, lot=lot, latitude=lat, longitude=lng, **extra)
+    return make_restaurant(slug, latitude=lat, longitude=lng, **extra)
 
 
 class TestNearby:
@@ -61,15 +60,14 @@ class TestNearby:
         }
 
     def test_the_nearest_restaurant_comes_first(self, api: APIClient) -> None:
-        lot = make_lot()
-        make_restaurant("cafe-far", lot=lot, latitude=25.2030, longitude=55.2700)
-        make_restaurant("cafe-near", lot=lot, latitude=25.2005, longitude=55.2700)
+        make_restaurant("cafe-far", latitude=25.2030, longitude=55.2700)
+        make_restaurant("cafe-near", latitude=25.2005, longitude=55.2700)
 
         slugs = [r["slug"] for r in api.get(NEARBY, INSIDE).json()["restaurants"]]
 
         assert slugs == ["cafe-near", "cafe-far"]
 
-    def test_outside_every_lot_the_list_is_empty_and_the_nearest_is_named(
+    def test_outside_the_search_distance_the_list_is_empty_and_the_nearest_is_named(
         self, api: APIClient
     ) -> None:
         make_at("cafe-a", 25.2002, 55.2702)
@@ -81,12 +79,8 @@ class TestNearby:
         nearest = body["nearest"]
         assert nearest["slug"] == "cafe-a"
         assert nearest["distance_m"] > 10_000
-        assert nearest["parking_lot"] == {
-            "name": "Lot of cafe-a",
-            "latitude": 25.2,
-            "longitude": 55.27,
-            "radius_m": 300,
-        }
+        assert "parking_lot" not in nearest
+        assert "service_radius_m" not in nearest
 
     def test_with_no_restaurant_at_all_there_is_nothing_nearest(
         self, api: APIClient
@@ -95,13 +89,57 @@ class TestNearby:
 
         assert body == {"restaurants": []}
 
-    def test_the_range_is_the_lots_radius_not_the_restaurants(
+    def test_a_restaurant_serves_only_inside_its_own_service_distance(
         self, api: APIClient
     ) -> None:
-        lot = make_lot(latitude=25.2, longitude=55.27, radius_m=50)
-        make_restaurant("cafe-a", lot=lot, latitude=25.2, longitude=55.27)
+        make_at("cafe-a", 25.2001, 55.2701, service_radius_m=50)
 
-        # About 110 m from the centre of a lot whose radius is 50 m.
+        # About 100 m from a restaurant that serves cars within 50 m.
+        body = api.get(NEARBY, INSIDE).json()
+
+        assert body["restaurants"] == []
+        assert body["nearest"]["slug"] == "cafe-a"
+        assert body["nearest"]["service_radius_m"] == 50
+
+    def test_a_restaurant_is_listed_with_its_service_distance_when_it_has_one(
+        self, api: APIClient
+    ) -> None:
+        make_at("cafe-a", 25.2001, 55.2701, service_radius_m=300)
+
+        [entry] = api.get(NEARBY, INSIDE).json()["restaurants"]
+
+        assert entry["service_radius_m"] == 300
+
+    def test_a_restaurant_without_a_service_distance_is_listed_inside_the_search_distance(
+        self, api: APIClient
+    ) -> None:
+        # About 2.2 km north of the customer: inside the default 3 km search distance.
+        make_at("cafe-two-km", 25.221, 55.27)
+        # About 4.4 km away: outside it.
+        make_at("cafe-four-km", 25.241, 55.27)
+
+        slugs = [r["slug"] for r in api.get(NEARBY, INSIDE).json()["restaurants"]]
+
+        assert slugs == ["cafe-two-km"]
+
+    def test_the_search_distance_is_a_setting(
+        self, api: APIClient, settings: Any
+    ) -> None:
+        make_at("cafe-two-km", 25.221, 55.27)
+        settings.NEARBY_SEARCH_RADIUS_M = 500
+
+        assert api.get(NEARBY, INSIDE).json()["restaurants"] == []
+
+        settings.NEARBY_SEARCH_RADIUS_M = 5000
+
+        assert len(api.get(NEARBY, INSIDE).json()["restaurants"]) == 1
+
+    def test_the_search_distance_also_limits_a_larger_service_distance(
+        self, api: APIClient
+    ) -> None:
+        # Serves cars within 10 km, but the customer is about 4.4 km away: beyond 3 km.
+        make_at("cafe-a", 25.241, 55.27, service_radius_m=10_000)
+
         body = api.get(NEARBY, INSIDE).json()
 
         assert body["restaurants"] == []
@@ -132,14 +170,9 @@ class TestNearby:
 
     def test_is_open_follows_the_screen_heartbeat(self, api: APIClient) -> None:
         now = timezone.now()
-        lot = make_lot()
-        make_restaurant(
-            "online", lot=lot, screen_last_seen_at=now - timedelta(seconds=10)
-        )
-        make_restaurant(
-            "stale", lot=lot, screen_last_seen_at=now - timedelta(seconds=300)
-        )
-        make_restaurant("never", lot=lot)
+        make_restaurant("online", screen_last_seen_at=now - timedelta(seconds=10))
+        make_restaurant("stale", screen_last_seen_at=now - timedelta(seconds=300))
+        make_restaurant("never")
 
         entries = {
             r["slug"]: r["is_open"]
@@ -152,9 +185,8 @@ class TestNearby:
         self, api: APIClient, settings: Any
     ) -> None:
         settings.REQUIRE_SCREEN_ONLINE = True
-        lot = make_lot()
-        make_restaurant("online", lot=lot, screen_last_seen_at=timezone.now())
-        make_restaurant("offline", lot=lot)
+        make_restaurant("online", screen_last_seen_at=timezone.now())
+        make_restaurant("offline")
 
         body = api.get(NEARBY, INSIDE).json()
 
@@ -169,8 +201,7 @@ class TestNearby:
         assert api.get(NEARBY, FAR_AWAY).json() == {"restaurants": []}
 
     def test_the_logo_is_an_absolute_url(self, api: APIClient) -> None:
-        lot = make_lot()
-        make_restaurant("cafe-a", lot=lot, logo="restaurants/logos/a.png")
+        make_restaurant("cafe-a", logo="restaurants/logos/a.png")
 
         [entry] = api.get(NEARBY, INSIDE).json()["restaurants"]
 
@@ -194,7 +225,7 @@ class TestNearby:
                 }
             ),
         }
-        make_restaurant("cafe-a", lot=make_lot(), logo="restaurants/logos/a.png")
+        make_restaurant("cafe-a", logo="restaurants/logos/a.png")
 
         [entry] = api.get(NEARBY, INSIDE).json()["restaurants"]
 
@@ -276,7 +307,8 @@ class TestDetail:
         assert body["brand_colour"] == "#1A73E8"
         assert body["currency"] == "AED"
         assert body["logo_url"].startswith("http")
-        assert body["parking_lot"]["name"] == "Lot of cafe-a"
+        assert "parking_lot" not in body
+        assert "service_radius_m" not in body
         assert [i["caption_en"] for i in body["menu_images"]] == ["One", "Two"]
         assert body["menu_images"][0]["image_url"].startswith("http")
         # Categories follow their sort order; the inactive one is not shown.
@@ -301,6 +333,28 @@ class TestDetail:
                 "is_default": True,
             }
         ]
+
+    def test_the_service_distance_is_shown_when_the_restaurant_has_one(
+        self, api: APIClient
+    ) -> None:
+        make_restaurant("cafe-a", service_radius_m=300)
+
+        assert api.get(self.url("cafe-a")).json()["service_radius_m"] == 300
+
+    def test_a_category_has_an_optional_picture_like_an_item(
+        self, api: APIClient
+    ) -> None:
+        restaurant = make_restaurant("cafe-pic")
+        pictured = make_category(restaurant, "Burgers", image="menu/burgers.webp")
+        make_category(restaurant, "Drinks")
+        make_item(pictured, "Chicken burger")
+
+        body = api.get(self.url("cafe-pic")).json()
+
+        burgers, drinks = body["menu"]
+        assert burgers["image_url"].startswith("http")
+        assert burgers["image_url"].endswith("menu/burgers.webp")
+        assert drinks["image_url"] is None
 
     def test_another_restaurants_menu_never_leaks_in(self, api: APIClient) -> None:
         a, b = make_restaurant("cafe-a"), make_restaurant("cafe-b")
@@ -372,3 +426,121 @@ class TestReservedSlug:
             restaurant.clean()
 
         assert "slug" in error.value.message_dict
+
+
+class TestEnglishOnlyRestaurant:
+    """No Arabic text is stored, yet every Arabic field of the API is filled with the English
+    text, so a client never receives an empty name."""
+
+    def test_the_detail_falls_back_to_english_for_every_arabic_field(
+        self, api: APIClient
+    ) -> None:
+        restaurant = make_restaurant("gulf-food", name_ar="")
+        category = MenuCategory.objects.create(restaurant=restaurant, name_en="Burgers")
+        item = MenuItem.objects.create(
+            category=category,
+            name_en="Chicken burger",
+            description_en="Grilled, with fries",
+            price_minor=1800,
+        )
+        group = OptionGroup.objects.create(item=item, name_en="Size")
+        Option.objects.create(group=group, name_en="Large", price_delta_minor=300)
+        RestaurantMenuImage.objects.create(
+            restaurant=restaurant, image="menu/1.jpg", caption_en="Main menu"
+        )
+
+        body = api.get("/api/v1/restaurants/gulf-food").json()
+
+        assert body["name_ar"] == "Gulf Food"
+        [image] = body["menu_images"]
+        assert image["caption_ar"] == "Main menu"
+        [cat] = body["menu"]
+        assert cat["name_ar"] == "Burgers"
+        [entry] = cat["items"]
+        assert entry["name_ar"] == "Chicken burger"
+        assert entry["description_ar"] == "Grilled, with fries"
+        [grp] = entry["option_groups"]
+        assert grp["name_ar"] == "Size"
+        assert grp["options"][0]["name_ar"] == "Large"
+
+    def test_nearby_falls_back_to_english_for_the_name(self, api: APIClient) -> None:
+        make_at("gulf-food", 25.2002, 55.2702, name_ar="")
+
+        [entry] = api.get(NEARBY, INSIDE).json()["restaurants"]
+
+        assert entry["name_en"] == "Gulf Food"
+        assert entry["name_ar"] == "Gulf Food"
+
+    def test_an_arabic_text_is_returned_as_it_was_entered(self, api: APIClient) -> None:
+        restaurant = make_restaurant("cafe-ar", name_ar="مقهى")
+        item = make_item(make_category(restaurant), "Karak tea")
+        item.description_en = "Strong"
+        item.description_ar = "قوي"
+        item.save()
+
+        body = api.get("/api/v1/restaurants/cafe-ar").json()
+
+        assert body["name_ar"] == "مقهى"
+        entry = body["menu"][0]["items"][0]
+        assert entry["name_ar"] == "شاي"
+        assert entry["description_ar"] == "قوي"
+
+
+class TestNestedMenu:
+    """Categories may sit inside categories (up to three levels). The list stays flat, depth
+    first, and a subcategory carries the id of its parent."""
+
+    def url(self, slug: str) -> str:
+        return f"/api/v1/restaurants/{slug}"
+
+    def test_the_menu_is_flat_depth_first_with_the_parent_id_on_subcategories(
+        self, api: APIClient
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        drinks = make_category(restaurant, "Drinks", sort_order=2)
+        burgers = make_category(restaurant, "Burgers", sort_order=1)
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        chicken = make_category(restaurant, "Chicken", parent=grilled)
+        make_item(burgers, "House burger", 1500)
+        make_item(chicken, "Chicken burger", 1800)
+
+        body = api.get(self.url("cafe-a")).json()
+
+        assert [c["name_en"] for c in body["menu"]] == [
+            "Burgers",
+            "Grilled",
+            "Chicken",
+            "Drinks",
+        ]
+        by_name = {c["name_en"]: c for c in body["menu"]}
+        assert "parent_id" not in by_name["Burgers"]
+        assert "parent_id" not in by_name["Drinks"]
+        assert by_name["Grilled"]["parent_id"] == str(burgers.pk)
+        assert by_name["Chicken"]["parent_id"] == str(grilled.pk)
+        assert [i["name_en"] for i in by_name["Burgers"]["items"]] == ["House burger"]
+        assert [i["name_en"] for i in by_name["Chicken"]["items"]] == ["Chicken burger"]
+        assert by_name["Drinks"]["items"] == []
+        assert str(drinks.pk) == by_name["Drinks"]["id"]
+
+    def test_hiding_a_category_hides_its_subcategories_and_their_items(
+        self, api: APIClient
+    ) -> None:
+        restaurant = make_restaurant("cafe-a")
+        burgers = make_category(restaurant, "Burgers", is_active=False)
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        make_item(grilled, "Hidden burger")
+        make_category(restaurant, "Drinks")
+
+        body = api.get(self.url("cafe-a")).json()
+
+        assert [c["name_en"] for c in body["menu"]] == ["Drinks"]
+
+    def test_a_menu_without_subcategories_is_unchanged(self, api: APIClient) -> None:
+        restaurant = make_restaurant("cafe-a")
+        make_item(make_category(restaurant, "Drinks"), "Karak tea")
+
+        [category] = api.get(self.url("cafe-a")).json()["menu"]
+
+        # No `parent_id` for a top-level category; `image_url` is always there (null without a picture).
+        assert set(category) == {"id", "name_en", "name_ar", "image_url", "items"}
+        assert category["image_url"] is None

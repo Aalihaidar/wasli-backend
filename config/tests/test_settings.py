@@ -11,8 +11,9 @@ def test_wasli_settings_have_valid_values() -> None:
     assert settings.ENVIRONMENT in {"local", "staging", "production"}
     assert settings.LOCATION_CHECK in {"off", "warn", "enforce"}
     assert isinstance(settings.REQUIRE_SCREEN_ONLINE, bool)
+    assert isinstance(settings.REQUIRE_VERIFIED_PHONE, bool)
     assert settings.AI_TIMEOUT_SECONDS >= 1
-    assert settings.AI_DAILY_REQUEST_LIMIT >= 0
+    assert settings.GEMINI_DAILY_REQUEST_LIMIT >= 0
 
 
 def test_log_lines_name_the_environment() -> None:
@@ -27,3 +28,13 @@ def test_log_lines_carry_the_request_id() -> None:
 
     assert "[{request_id}]" in logging_config["formatters"]["plain"]["format"]
     assert logging_config["handlers"]["console"]["filters"] == ["request_id"]
+
+
+def test_the_admin_keeps_djangos_default_upload_handlers() -> None:
+    """Only the voice endpoint reads an upload in memory (chat/uploads.py); the admin's image
+    uploads keep Django's handlers, which write a large file to a temporary file instead of
+    dropping it."""
+    assert settings.FILE_UPLOAD_HANDLERS == [
+        "django.core.files.uploadhandler.MemoryFileUploadHandler",
+        "django.core.files.uploadhandler.TemporaryFileUploadHandler",
+    ]

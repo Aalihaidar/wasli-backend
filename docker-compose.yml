@@ -54,9 +54,10 @@ x-dev-image: &dev-image
     CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
     # Wasli settings (config/settings/base.py). Locally the assistant is the fake provider, so
-    # no key is needed; set AI_PROVIDER=gemini plus the key and model in .env to use the real one.
+    # no key is needed; set AI_PROVIDER=groq (or gemini) plus its keys and models in .env to use a real one.
     ENVIRONMENT: ${ENVIRONMENT:-local}
     LOCATION_CHECK: ${LOCATION_CHECK:-warn}
+    REQUIRE_VERIFIED_PHONE: ${REQUIRE_VERIFIED_PHONE:-false}
     MESSAGING_BACKEND: ${MESSAGING_BACKEND:-outbox}
     OUTBOX_RETENTION_HOURS: ${OUTBOX_RETENTION_HOURS:-24}
     # Uploaded images: the local disk by default; set MEDIA_STORAGE=r2 and the R2_* values in .env
@@ -68,11 +69,29 @@ x-dev-image: &dev-image
     R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
     R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
     REQUIRE_SCREEN_ONLINE: ${REQUIRE_SCREEN_ONLINE:-false}
+    NEARBY_SEARCH_RADIUS_M: ${NEARBY_SEARCH_RADIUS_M:-3000}
     AI_PROVIDER: ${AI_PROVIDER:-fake}
+    AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-15}
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     GEMINI_MODEL: ${GEMINI_MODEL:-}
-    AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-15}
-    AI_DAILY_REQUEST_LIMIT: ${AI_DAILY_REQUEST_LIMIT:-100}
+    GEMINI_DAILY_REQUEST_LIMIT: ${GEMINI_DAILY_REQUEST_LIMIT:-18}
+    # Groq keys are numbered, one variable each (up to ten), used in order.
+    GROQ_API_KEY_1: ${GROQ_API_KEY_1:-}
+    GROQ_API_KEY_2: ${GROQ_API_KEY_2:-}
+    GROQ_API_KEY_3: ${GROQ_API_KEY_3:-}
+    GROQ_API_KEY_4: ${GROQ_API_KEY_4:-}
+    GROQ_API_KEY_5: ${GROQ_API_KEY_5:-}
+    GROQ_API_KEY_6: ${GROQ_API_KEY_6:-}
+    GROQ_API_KEY_7: ${GROQ_API_KEY_7:-}
+    GROQ_API_KEY_8: ${GROQ_API_KEY_8:-}
+    GROQ_API_KEY_9: ${GROQ_API_KEY_9:-}
+    GROQ_API_KEY_10: ${GROQ_API_KEY_10:-}
+    GROQ_CHAT_MODEL: ${GROQ_CHAT_MODEL:-}
+    GROQ_STT_MODEL: ${GROQ_STT_MODEL:-}
+    GROQ_CHAT_RPM: ${GROQ_CHAT_RPM:-30}
+    GROQ_CHAT_RPD: ${GROQ_CHAT_RPD:-1000}
+    GROQ_STT_RPM: ${GROQ_STT_RPM:-20}
+    GROQ_STT_RPD: ${GROQ_STT_RPD:-2000}
     # `environment` wins over `env_file`, so every value keeps a ${VAR:-default}
     # form — setting it in .env (e.g. an external DATABASE_URL) takes effect.
     DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-django}:${POSTGRES_PASSWORD:-django_pass}@db:5432/${POSTGRES_DB:-django_dev}}
@@ -138,7 +157,7 @@ services:
     command: bash scripts/start-beat.sh
 
   db:
-    image: postgres:18.6-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    image: postgres:18.6-alpine@sha256:9ba53c7d41ea093baf5c1ba635ba5434c4f979880527d49bb7d9237d3193085b
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-django}
@@ -159,7 +178,7 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:8.10.2-alpine@sha256:9f8d2d789b9a1d1e3f283f979aa9cbf393373806472e1ccd460e2f9c869b833b
+    image: redis:8.10.3-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
     restart: unless-stopped
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:

@@ -98,3 +98,14 @@ pmmk
 pmsu
 neondb
 onrender
+
+# Menu and data-entry examples (docs/data-entry.md)
+karak
+shawarma
+dajaj
+rrggbb
+fujairah
+squoosh
+mozjpeg
+oxipng
+groq

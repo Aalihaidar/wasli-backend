@@ -13,13 +13,28 @@ from typing import Any
 
 # ErrorCode401Enum, ErrorCode409Enum, ... (config.api_errors and the package's own).
 ERROR_CODE_LIST = re.compile(r"ErrorCode\d{3}Enum")
+# Other lists the product will add values to (a new kind of message, a new step of the
+# conversation, a new way to serve an order): the apps treat a value they do not know as unknown.
+EXTENSIBLE_LISTS = frozenset(
+    {
+        "MessageKindEnum",
+        "ConversationStateEnum",
+        "OrderTypeEnum",
+        "OrderStatusEnum",
+        "StaffRoleEnum",
+        "StaffPermissionEnum",
+        "DistanceBandEnum",
+    }
+)
 
 
 def make_error_codes_extensible(
     result: dict[str, Any], generator: Any, request: Any, public: bool
 ) -> dict[str, Any]:
-    """Turn every ``ErrorCode<status>Enum`` into an ``x-extensible-enum``."""
+    """Turn every ``ErrorCode<status>Enum`` and the lists in ``EXTENSIBLE_LISTS`` into an
+    ``x-extensible-enum``."""
     for name, schema in result.get("components", {}).get("schemas", {}).items():
-        if ERROR_CODE_LIST.fullmatch(name) and "enum" in schema:
+        extensible = ERROR_CODE_LIST.fullmatch(name) or name in EXTENSIBLE_LISTS
+        if extensible and "enum" in schema:
             schema["x-extensible-enum"] = schema.pop("enum")
     return result

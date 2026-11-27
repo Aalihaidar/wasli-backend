@@ -35,6 +35,8 @@ class ErrorCode409Enum(models.TextChoices):
     ACCOUNT_EXISTS = "account_exists"
     CONTACT_ALREADY_SET = "contact_already_set"
     NO_PENDING_CONTACT = "no_pending_contact"
+    INVALID_ACTION_FOR_STATE = "invalid_action_for_state"
+    CONVERSATION_EXPIRED = "conversation_expired"
 
 
 class Error409Serializer(serializers.Serializer):  # type: ignore[misc]
@@ -55,6 +57,7 @@ class ErrorCode403Enum(models.TextChoices):
 
     PERMISSION_DENIED = "permission_denied"
     ACCOUNT_NOT_VERIFIED = "account_not_verified"
+    PHONE_NOT_VERIFIED = "phone_not_verified"
 
 
 class Error403Serializer(serializers.Serializer):  # type: ignore[misc]

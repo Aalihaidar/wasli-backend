@@ -10,7 +10,7 @@ import pytest
 from assistant import prompts
 from assistant.menu import build_prompt_menu
 from assistant.types import AudioInput, CarFields, CurrentLine
-from menu.models import MenuCategory
+from menu.models import MenuCategory, MenuItem, Option, OptionGroup
 from menu.tests.factories import make_category, make_group, make_item, make_option
 from restaurants.models import Restaurant
 from restaurants.tests.factories import make_restaurant
@@ -177,3 +177,80 @@ class TestCustomerText:
         text = prompts.message_text(AudioInput(b"\x00", "audio/wav"))
 
         assert "attached audio" in text and "<customer_message>" not in text
+
+
+class TestEnglishOnlyMenu:
+    def _english_only_menu(self) -> Any:
+        restaurant = make_restaurant("gulf-food", name_ar="")
+        burgers = MenuCategory.objects.create(restaurant=restaurant, name_en="Burgers")
+        burger = MenuItem.objects.create(
+            category=burgers,
+            name_en="Chicken burger",
+            price_minor=1800,
+            aliases=["برجر دجاج", "chicken zinger"],
+        )
+        size = OptionGroup.objects.create(item=burger, name_en="Size", min_select=1)
+        Option.objects.create(group=size, name_en="Large", is_default=True)
+        return restaurant
+
+    def test_an_entry_without_an_arabic_name_has_no_arabic_key_in_the_prompt(
+        self,
+    ) -> None:
+        menu = build_prompt_menu(self._english_only_menu())
+
+        [item] = prompts.menu_json(menu)
+
+        assert "name_ar" not in item
+        assert "name_ar" not in item["option_groups"][0]
+        assert "name_ar" not in item["option_groups"][0]["options"][0]
+        assert item["name_en"] == "Chicken burger"
+
+    def test_the_aliases_of_an_english_only_item_still_reach_the_prompt(self) -> None:
+        menu = build_prompt_menu(self._english_only_menu())
+
+        [item] = prompts.menu_json(menu)
+
+        assert item["aliases"] == ["برجر دجاج", "chicken zinger"]
+
+    def test_an_entry_with_an_arabic_name_keeps_it(self) -> None:
+        restaurant, _ = build_restaurant_menu()
+
+        items = prompts.menu_json(build_prompt_menu(restaurant))
+
+        assert all(item["name_ar"] for item in items)
+
+    def test_the_parse_rules_tell_the_model_to_match_arabic_against_an_english_menu(
+        self,
+    ) -> None:
+        request = prompts.parse_order_request(
+            build_prompt_menu(self._english_only_menu()), [], None, "برجر دجاج", "ar"
+        )
+
+        assert "speak Arabic about an English-only menu" in request.system
+        assert "left out when the restaurant has English names only" in request.system
+
+
+class TestNestedMenu:
+    def test_items_in_subcategories_reach_the_prompt(self) -> None:
+        restaurant = make_restaurant("gulf-food")
+        burgers = make_category(restaurant, "Burgers")
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        chicken = make_category(restaurant, "Chicken", parent=grilled)
+        make_item(burgers, "House burger")
+        make_item(chicken, "Chicken burger")
+
+        names = {i.name_en for i in build_prompt_menu(restaurant).items}
+
+        assert names == {"House burger", "Chicken burger"}
+
+    def test_items_under_an_inactive_category_never_reach_the_prompt(self) -> None:
+        restaurant = make_restaurant("gulf-food")
+        burgers = make_category(restaurant, "Burgers", is_active=False)
+        grilled = make_category(restaurant, "Grilled", parent=burgers)
+        make_item(burgers, "Hidden one")
+        make_item(grilled, "Hidden two")
+        make_item(make_category(restaurant, "Drinks"), "Karak tea")
+
+        names = {i.name_en for i in build_prompt_menu(restaurant).items}
+
+        assert names == {"Karak tea"}
