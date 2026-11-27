@@ -121,6 +121,63 @@ database it stays idle unless `BEAT_ON_EXTERNAL_DATABASE=true` is set in `.env`.
 | Mailpit | <http://localhost:8025> |
 | Flower | <http://localhost:5556> (`celery -A config flower --port=5555`; host port 5556) |
 
+## Running the tests
+
+```bash
+pytest                     # the whole suite, as CI runs it
+pytest orders/ chat/       # only some apps
+pytest orders/tests/test_staff_decision_api.py -k reject
+```
+
+`pytest` makes its own `test_` database next to the one `DATABASE_URL` points at and drops it after. Against the
+staging Neon project the whole suite takes from 25 minutes to over an hour, so run the tests of the apps you changed and
+let CI run the rest. Tests never call a real assistant provider (they use the fake adapter). The other checks are the
+ones CI runs:
+
+```bash
+ruff check . && ruff format --check .
+mypy --no-incremental .
+bash scripts/schema.sh check     # after an API change: bash scripts/schema.sh generate
+pre-commit run --all-files
+```
+
+## Deploying
+
+Staging runs on Render from `develop` (production will run from `main`). Auto-Deploy is off, so a merge never changes a
+running service: after a group of pull requests is merged, start **Manual Deploy** on the service in the Render dashboard.
+The container applies the database migrations before it starts (`scripts/entrypoint.prod.sh`). Then check that
+`/healthz` answers `200` and that `/api/v1/config` answers with the values you expect (`ai_enabled`, `location_check`).
+A change that adds a migration is deployed the same way; read the pull request first for one-off commands (for example
+`python manage.py organize_media` after the image folders change).
+
+## Environment variables
+
+Every setting is read from the environment. [`.env.example`](.env.example) lists the names with a comment (`WEB_CONCURRENCY` is read by the production
+entrypoint and `DJANGO_LOG_LEVEL` by the settings, so they are only here), and `docker-compose.yml` passes them to the dev
+containers; real values live only in `.env` (git-ignored) and in the Render dashboard. The groups:
+
+| Group | Variables |
+| --- | --- |
+| The service | `ENVIRONMENT` (`local`, `staging` or `production`), `SECRET_KEY`, `DEBUG`, `DATABASE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `CORS_ALLOWED_ORIGINS`, `WEB_CONCURRENCY` |
+| What an order needs | `LOCATION_CHECK` (`off`, `warn`, `enforce`), `REQUIRE_VERIFIED_PHONE`, `REQUIRE_SCREEN_ONLINE`, `NEARBY_SEARCH_RADIUS_M` |
+| Messages | `MESSAGING_BACKEND` (`outbox` on local and staging, `disabled` on production until a real provider exists), `OUTBOX_RETENTION_HOURS` |
+| Images | `MEDIA_STORAGE` (`filesystem` or `r2`) and the five `R2_*` variables |
+| The assistant | `AI_PROVIDER` (`groq`, `gemini` or `fake`), `AI_TIMEOUT_SECONDS`, `GROQ_API_KEY_1` to `GROQ_API_KEY_10`, `GROQ_CHAT_MODEL`, `GROQ_STT_MODEL`, the `GROQ_*_RPM` and `GROQ_*_RPD` limits, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_DAILY_REQUEST_LIMIT` ([`docs/groq-setup.md`](docs/groq-setup.md), [`docs/gemini-setup.md`](docs/gemini-setup.md)) |
+| Logs | `LOG_LEVEL`, `DJANGO_LOG_LEVEL` |
+
+## Logs
+
+Everything goes to standard output. The application's lines carry the environment and the request id. Two kinds of line
+matter when something goes wrong:
+
+- The access line, one per request: the client address, the method and the path, the status, the size, the time in
+  milliseconds and the request id the API sent back (`rid=`). The query string is never printed, because
+  `GET /restaurants/nearby` carries a customer's position in it.
+- The assistant line, one per call to the understanding provider: `assistant call provider=groq purpose=parse_order
+  input=text outcome=ok latency_ms=412 error=-`. The same facts are stored as a row in the admin (Assistant calls), which
+  also counts the daily budget. Neither holds what a customer wrote or said, the provider's answer, a position or a phone
+  number.
+
 ## Development
 
 Work happens on topic branches and pull requests into `develop`; `develop` opens a pull

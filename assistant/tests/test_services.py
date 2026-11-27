@@ -96,6 +96,26 @@ class TestCallLog:
 
         assert SECRET not in caplog.text
 
+    def test_each_call_writes_one_line_with_the_facts_only(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.INFO, logger="assistant.calls"):
+            Assistant(FakeAdapter.recorded()).classify_reply(SECRET, "en")
+            with pytest.raises(AssistantError):
+                Assistant(FakeAdapter(fail_with=AssistantTimeout())).classify_reply(
+                    SECRET, "en"
+                )
+
+        lines = [record.getMessage() for record in caplog.records]
+        assert len(lines) == 2
+        assert lines[0].startswith(
+            "assistant call provider=fake purpose=classify_reply input=text outcome=ok latency_ms="
+        )
+        assert lines[0].endswith("error=-")
+        assert "outcome=timeout" in lines[1]
+        assert "error=" in lines[1] and not lines[1].endswith("error=-")
+        assert SECRET not in caplog.text
+
     def test_a_voice_call_is_logged_as_audio(self) -> None:
         Assistant(FakeAdapter.recorded()).transcribe(
             AudioInput(b"no straw please", "audio/wav"), "en"
