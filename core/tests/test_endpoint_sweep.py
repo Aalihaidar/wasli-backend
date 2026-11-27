@@ -31,6 +31,7 @@ STAFF_PUBLIC_ROUTES = {"auth/login"}
 ORDER_ROUTE_BODIES: dict[str, dict[str, Any]] = {
     "accept": {"eta_minutes": 10},
     "reject": {"reason_code": "too_busy"},
+    "ready": {},
 }
 
 

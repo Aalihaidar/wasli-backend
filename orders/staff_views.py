@@ -1,4 +1,5 @@
-"""The restaurant screen's orders (``/api/v1/staff/orders``): the polling list, accept and reject."""
+"""The restaurant screen's orders (``/api/v1/staff/orders``): the polling list, accept, reject and
+the Ready step."""
 
 from uuid import UUID
 
@@ -13,7 +14,12 @@ from core.permissions import Permission
 from restaurants.permissions import get_membership, require_permission
 from restaurants.services import mark_screen_online
 
-from .services import accept_order, orders_changed_since, reject_order
+from .services import (
+    accept_order,
+    mark_order_ready,
+    orders_changed_since,
+    reject_order,
+)
 from .staff_serializers import (
     StaffAcceptSerializer,
     StaffOrderListSerializer,
@@ -132,5 +138,34 @@ class StaffOrderRejectView(APIView):  # type: ignore[misc]
             actor=membership.user,
             reason_code=serializer.validated_data["reason_code"],
             note=serializer.validated_data.get("note", ""),
+        )
+        return Response(StaffOrderSerializer(order, context={"request": request}).data)
+
+
+class StaffOrderReadyView(APIView):  # type: ignore[misc]
+    permission_classes = [  # noqa: RUF012
+        IsAuthenticated,
+        require_permission(Permission.ORDERS_DECIDE),
+    ]
+
+    @extend_schema(
+        operation_id="staff_orders_ready",
+        tags=["staff"],
+        summary="Mark an accepted order as ready",
+        description=(
+            "Says that an accepted order of the member's restaurant is ready and on its way to "
+            "the car. There is no body. The customer's chat gets a `result` message with "
+            "`status: ready` in the same step. Only an accepted order can become ready: a "
+            "placed, rejected or already ready order is `409 order_invalid_transition` (poll "
+            "the list to see its real state). An order of another restaurant, or an unknown "
+            "id, is `404`. Answers with the updated order. Needs `orders.decide`."
+        ),
+        request=None,
+        responses={200: StaffOrderSerializer},
+    )
+    def post(self, request: Request, id: UUID) -> Response:
+        membership = get_membership(request)
+        order = mark_order_ready(
+            order_id=id, restaurant=membership.restaurant, actor=membership.user
         )
         return Response(StaffOrderSerializer(order, context={"request": request}).data)

@@ -41,3 +41,4 @@ Copy the shape of an existing one: status, date, context, decision, consequences
 the code and the contract instead of repeating them. Do not put secrets, personal data or private account details in a
 record. Add the new file to the table above in the same pull request as the change it explains.
 | [0026](0026-the-staff-decision-endpoints-and-the-result-message.md) | Accept and reject endpoints that answer with the updated order and post the `result` message in the same transaction; the shape of that message | accepted, built |
+| [0027](0027-the-ready-step.md) | The optional Ready step: `accepted` to `ready`, one endpoint, `ready_at` on the staff order and a `result` message that carries no extra fields | accepted, built |

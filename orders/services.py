@@ -7,7 +7,8 @@ lines, the car, the note and the position into the order so later changes never 
 does all of it in one transaction.
 
 ``accept_order`` and ``reject_order`` are the state machine of the restaurant's side: a placed
-order is answered once, every other transition is a ``409 order_invalid_transition``, and each
+order is answered once, ``mark_order_ready`` moves an accepted order to ready, every other
+transition is a ``409 order_invalid_transition``, and each
 change writes an ``OrderEvent`` and posts the ``result`` message into the customer's chat, all in
 one transaction. ``orders_changed_since`` is the restaurant screen's polling
 list.
@@ -212,8 +213,9 @@ def _field_error(field: str, message: str, code: str) -> ValidationError:
     return ValidationError({field: [ErrorDetail(message, code)]})
 
 
-def _lock_placed_order(order_id: UUID, restaurant: Restaurant) -> Order:
-    """The restaurant's own order, locked, when it is still waiting for an answer.
+def _lock_order(order_id: UUID, restaurant: Restaurant, expected: str) -> Order:
+    """The restaurant's own order, locked, when it is in the ``expected`` state (``placed`` for
+    an answer, ``accepted`` for the Ready step).
 
     An order of another restaurant is a 404, never a 403: the answer must not confirm that it
     exists. Two screens answering together are serialised by the lock, and the second one
@@ -226,16 +228,16 @@ def _lock_placed_order(order_id: UUID, restaurant: Restaurant) -> Order:
         )
     except Order.DoesNotExist:
         raise NotFound from None
-    if order.status != OrderStatus.PLACED:
+    if order.status != expected:
         raise OrderInvalidTransition
     return order
 
 
-def _record(order: Order, to_status: str, actor: User) -> None:
+def _record(order: Order, from_status: str, to_status: str, actor: User) -> None:
     OrderEvent.objects.create(
         restaurant=order.restaurant,
         order=order,
-        from_status=OrderStatus.PLACED,
+        from_status=from_status,
         to_status=to_status,
         actor_type=ActorType.STAFF,
         actor_id=actor.pk,
@@ -254,12 +256,12 @@ def accept_order(
             "eta_minutes", "Choose 5, 10 or 15 minutes.", "invalid_choice"
         )
     with transaction.atomic():
-        order = _lock_placed_order(order_id, restaurant)
+        order = _lock_order(order_id, restaurant, OrderStatus.PLACED)
         order.status = OrderStatus.ACCEPTED
         order.eta_minutes = eta_minutes
         order.accepted_at = timezone.now()
         order.save(update_fields=["status", "eta_minutes", "accepted_at", "updated_at"])
-        _record(order, OrderStatus.ACCEPTED, actor)
+        _record(order, OrderStatus.PLACED, OrderStatus.ACCEPTED, actor)
         post_order_result(order)
     return order
 
@@ -288,7 +290,7 @@ def reject_order(
             "note", "Say why: a note is required for the reason other.", "required"
         )
     with transaction.atomic():
-        order = _lock_placed_order(order_id, restaurant)
+        order = _lock_order(order_id, restaurant, OrderStatus.PLACED)
         order.status = OrderStatus.REJECTED
         order.rejection_reason_code = reason_code
         order.rejection_note = note
@@ -302,7 +304,21 @@ def reject_order(
                 "updated_at",
             ]
         )
-        _record(order, OrderStatus.REJECTED, actor)
+        _record(order, OrderStatus.PLACED, OrderStatus.REJECTED, actor)
+        post_order_result(order)
+    return order
+
+
+def mark_order_ready(*, order_id: UUID, restaurant: Restaurant, actor: User) -> Order:
+    """The restaurant says an accepted order is ready and on its way to the car. Only an
+    accepted order can become ready; any other state is ``409 order_invalid_transition``.
+    The customer's chat gets the ``result`` message in the same transaction."""
+    with transaction.atomic():
+        order = _lock_order(order_id, restaurant, OrderStatus.ACCEPTED)
+        order.status = OrderStatus.READY
+        order.ready_at = timezone.now()
+        order.save(update_fields=["status", "ready_at", "updated_at"])
+        _record(order, OrderStatus.ACCEPTED, OrderStatus.READY, actor)
         post_order_result(order)
     return order
 

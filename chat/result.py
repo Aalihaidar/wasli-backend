@@ -3,7 +3,7 @@
 The message is a bot message of kind ``result``. Its text is written here in the conversation's
 language; its ``payload`` is what the app reads: ``order_id``, ``number`` and ``status`` always,
 ``eta_minutes`` only when accepted, ``rejection_reason_code`` and ``rejection_note`` only when
-rejected. A property that does not apply is absent, never ``null``, and the note is absent when
+rejected, nothing more when the order is ready. A property that does not apply is absent, never ``null``, and the note is absent when
 the restaurant gave none.
 """
 
@@ -17,7 +17,7 @@ from .texts import say
 
 
 def post_order_result(order: Order) -> Message:
-    """Add the ``result`` message for an order that was just accepted or rejected.
+    """Add the ``result`` message for an order that was just accepted, rejected or made ready.
 
     Call it inside the transaction that changed the order, so the customer never sees a
     decision without its message or the other way round."""
@@ -28,7 +28,9 @@ def post_order_result(order: Order) -> Message:
         "number": order.number,
         "status": order.status,
     }
-    if order.status == OrderStatus.ACCEPTED:
+    if order.status == OrderStatus.READY:
+        text = say("result_ready", locale, number=order.number)
+    elif order.status == OrderStatus.ACCEPTED:
         payload["eta_minutes"] = order.eta_minutes
         text = say(
             "result_accepted", locale, number=order.number, minutes=order.eta_minutes

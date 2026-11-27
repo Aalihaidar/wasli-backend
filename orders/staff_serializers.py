@@ -91,6 +91,10 @@ class StaffOrderSerializer(serializers.Serializer):  # type: ignore[misc]
         allow_null=True,
         help_text="When the order was accepted or rejected; null while it is placed.",
     )
+    ready_at = serializers.DateTimeField(
+        allow_null=True,
+        help_text="When the restaurant said the order is ready, else null.",
+    )
     eta_minutes = serializers.IntegerField(
         allow_null=True,
         help_text="The wait the restaurant gave when it accepted (5, 10 or 15), else null.",
